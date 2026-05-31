@@ -51,3 +51,17 @@ class TestHandlers:
         agent.model_name = "command-a-03-2025"
         small_text = "Короткий текст"
         assert agent._summarize_content(small_text, "web") == small_text
+
+    def test_summarize_triggers_on_large_content(self):
+        agent = AIAgent.__new__(AIAgent)
+        agent.cohere_client = None
+        agent.model_name = "command-a-03-2025"
+        large_text = "x" * 50000
+        assert agent._summarize_content(large_text, "pdf") == large_text[:50000]
+
+    def test_backoff_calculation(self):
+        agent = AIAgent.__new__(AIAgent)
+        delays = []
+        for attempt in range(3):
+            delays.append(0.5 * (2 ** attempt))
+        assert delays == [0.5, 1.0, 2.0]

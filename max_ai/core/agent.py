@@ -1,5 +1,6 @@
 import re
 import asyncio
+import time
 from typing import Optional
 import aiohttp
 from bs4 import BeautifulSoup
@@ -264,6 +265,9 @@ class AIAgent:
                 last_error = e
             except Exception as e:
                 last_error = e
+            
+            if attempt < retries - 1:
+                await asyncio.sleep(0.5 * (2 ** attempt))
 
         return f"Ошибка загрузки {url} после {retries} попыток: {str(last_error)}", 'error'
 
