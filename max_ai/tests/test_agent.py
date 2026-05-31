@@ -60,8 +60,15 @@ class TestHandlers:
         assert agent._summarize_content(large_text, "pdf") == large_text[:50000]
 
     def test_backoff_calculation(self):
-        agent = AIAgent.__new__(AIAgent)
         delays = []
         for attempt in range(3):
             delays.append(0.5 * (2 ** attempt))
         assert delays == [0.5, 1.0, 2.0]
+
+    def test_url_validation(self):
+        agent = AIAgent.__new__(AIAgent)
+        agent.conversation_history = []
+        urls = agent.extract_urls("Посмотри https://example.com")
+        assert urls == ["https://example.com"]
+        urls = agent.extract_urls("Невалидный: https://")
+        assert "https://" not in urls or len(urls) == 0

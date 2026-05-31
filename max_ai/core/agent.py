@@ -12,6 +12,8 @@ import io
 import urllib.parse
 from max_ai.constants import URL_PATTERN, MAX_CONTENT_LENGTH, SUMMARIZE_THRESHOLD
 
+URL_VALIDATION_PATTERN = re.compile(r'^https?://[^\s/$.?#].[^\s]*$')
+
 try:
     from pptx import Presentation
 except ImportError:
@@ -198,6 +200,7 @@ class AIAgent:
             HTMLHandler()
         ]
         self.conversation_history: list[dict[str, str]] = []
+        self._rate_limiter = asyncio.Semaphore(5)
 
     def clear_history(self) -> None:
         self.conversation_history = []
@@ -221,12 +224,17 @@ class AIAgent:
         return content[:MAX_CONTENT_LENGTH]
 
     def extract_urls(self, text: str) -> list[str]:
-        return URL_PATTERN.findall(text)
+        urls = URL_PATTERN.findall(text)
+        return [url for url in urls if URL_VALIDATION_PATTERN.match(url)]
 
     async def _fetch_url(self, url: str, session: aiohttp.ClientSession, retries: int = 3) -> tuple[str, str]:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
+        if not URL_VALIDATION_PATTERN.match(url):
+            return f"Невалидный URL: {url}", 'error'
+        
+        async with self._rate_limiter:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
 
         if 'youtube.com' in url.lower() or 'youtu.be' in url.lower():
             try:
