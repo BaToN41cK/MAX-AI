@@ -12,6 +12,15 @@ import urllib.parse
 from max_ai.constants import URL_PATTERN, MAX_CONTENT_LENGTH
 
 try:
+    from pptx import Presentation
+except ImportError:
+    Presentation = None  # type: ignore[misc,assignment]
+try:
+    from openpyxl import load_workbook
+except ImportError:
+    load_workbook = None  # type: ignore[misc,assignment]
+
+try:
     from mistralai import Mistral
 except ImportError:
     Mistral = None  # type: ignore[misc,assignment]
@@ -65,6 +74,87 @@ class DocxHandler(BaseHandler):
             return f"Ошибка обработки DOCX {url}: {str(e)}", 'error'
 
 
+class PptxHandler(BaseHandler):
+    async def can_handle(self, content_type: str, url: str) -> bool:
+        return ('application/vnd.openxmlformats-officedocument.presentationml.presentation' in content_type or
+                url.lower().endswith('.pptx'))
+
+    async def handle(self, content: bytes, url: str) -> tuple[str, str]:
+        if Presentation is None:
+            return f"Ошибка: библиотека python-pptx не установлена для обработки PPTX {url}", 'error'
+        try:
+            prs = Presentation(io.BytesIO(content))
+            text = ""
+            for slide in prs.slides:
+                for shape in slide.shapes:
+                    if hasattr(shape, "text") and shape.text:
+                        text += shape.text + "\n"
+            return text[:MAX_CONTENT_LENGTH], 'pptx'
+        except Exception as e:
+            return f"Ошибка обработки PPTX {url}: {str(e)}", 'error'
+
+
+class XlsxHandler(BaseHandler):
+    async def can_handle(self, content_type: str, url: str) -> bool:
+        return ('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' in content_type or
+                url.lower().endswith('.xlsx'))
+
+    async def handle(self, content: bytes, url: str) -> tuple[str, str]:
+        if load_workbook is None:
+            return f"Ошибка: библиотека openpyxl не установлена для обработки XLSX {url}", 'error'
+        try:
+            wb = load_workbook(io.BytesIO(content), read_only=True)
+            text = ""
+            for sheet in wb.sheetnames:
+                ws = wb[sheet]
+                for row in ws.iter_rows(values_only=True):
+                    row_text = "\t".join(str(cell) if cell is not None else "" for cell in row)
+                    if row_text.strip():
+                        text += row_text + "\n"
+            wb.close()
+            return text[:MAX_CONTENT_LENGTH], 'xlsx'
+        except Exception as e:
+            return f"Ошибка обработки XLSX {url}: {str(e)}", 'error'
+
+
+class XlsHandler(BaseHandler):
+    async def can_handle(self, content_type: str, url: str) -> bool:
+        return ('application/vnd.ms-excel' in content_type or
+                url.lower().endswith('.xls'))
+
+    async def handle(self, content: bytes, url: str) -> tuple[str, str]:
+        try:
+            import xlrd
+            wb = xlrd.open_workbook(file_contents=content)
+            text = ""
+            for sheet in wb.sheets():
+                for row_idx in range(sheet.nrows):
+                    row = sheet.row(row_idx)
+                    row_text = "\t".join(str(cell.value) for cell in row)
+                    if row_text.strip():
+                        text += row_text + "\n"
+            return text[:MAX_CONTENT_LENGTH], 'xls'
+        except ImportError:
+            return f"Ошибка: библиотека xlrd не установлена для обработки XLS {url}", 'error'
+        except Exception as e:
+            return f"Ошибка обработки XLS {url}: {str(e)}", 'error'
+
+
+class TxtHandler(BaseHandler):
+    async def can_handle(self, content_type: str, url: str) -> bool:
+        return ('text/plain' in content_type or
+                'text/markdown' in content_type or
+                url.lower().endswith('.txt') or
+                url.lower().endswith('.md'))
+
+    async def handle(self, content: bytes, url: str) -> tuple[str, str]:
+        try:
+            text = content.decode('utf-8', errors='ignore')
+            return text[:MAX_CONTENT_LENGTH], 'text'
+        except Exception as e:
+            return f"Ошибка обработки текстового файла {url}: {str(e)}", 'error'
+
+
 class HTMLHandler(BaseHandler):
     async def can_handle(self, content_type: str, url: str) -> bool:
         return True
@@ -100,6 +190,10 @@ class AIAgent:
         self.handlers: list[BaseHandler] = [
             PDFHandler(),
             DocxHandler(),
+            PptxHandler(),
+            XlsxHandler(),
+            XlsHandler(),
+            TxtHandler(),
             HTMLHandler()
         ]
         self.conversation_history: list[dict[str, str]] = []
@@ -131,10 +225,9 @@ class AIAgent:
                     transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['ru', 'en'])
                     text = ' '.join([item['text'] for item in transcript_list])
                     return text[:MAX_CONTENT_LENGTH], 'youtube'
-            except ImportError:
+            except (ImportError, AttributeError, Exception):
+                # Fall through to regular processing if YouTube API fails
                 pass
-            except Exception as e:
-                return f"Ошибка получения транскрипта YouTube {url}: {str(e)}", 'error'
 
         last_error: Optional[Exception] = None
         for attempt in range(retries):
@@ -146,10 +239,6 @@ class AIAgent:
 
                     for handler in self.handlers:
                         if await handler.can_handle(content_type, url):
-                            return await handler.handle(content, url)
-
-                    for handler in self.handlers:
-                        if isinstance(handler, HTMLHandler):
                             return await handler.handle(content, url)
 
                     return f"Не удалось обработать содержимое {url}: неизвестный тип контента", 'error'
@@ -190,6 +279,15 @@ class AIAgent:
         else:
             full_query = query
 
+        history_parts = []
+        for msg in self.conversation_history[-10:]:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            history_parts.append(f"{role}: {content}")
+        history_text = "\n".join(history_parts)
+        if history_text:
+            full_query = f"История диалога:\n{history_text}\n\nТекущий запрос:\n{full_query}"
+
         cohere_tokens = 0
         try:
             cohere_response = self.cohere_client.chat(
@@ -217,6 +315,18 @@ class AIAgent:
                 "- Добавь важные детали, которых не хватает.\n"
                 "- Улучши стиль и читаемость, сохранив при этом доброжелательный и профессиональный тон.\n"
                 "- Если ответ уже хорош, просто верни его без изменений.\n\n"
+                "- Не добавляй ничего, что не было в исходном запросе или черновом ответе, если это не необходимо для исправления ошибок или улучшения ясности.\n"
+                "- Не выдумывай факты и не добавляй информацию, которая не была предоставлена в запросе или черновом ответе.\n"
+                "- Выдавай ответ, зная что он выводится в cmd в свернутом виде.\n"
+                "- Ты предоставляеш ответы как обычный человек без указания что ты ИИ.\n\n"
+                "- Если в черновом ответе уже есть все необходимые детали и он не содержит ошибок, просто верни его без изменений.\n"
+                "- Представь что ты обычный человек который отвечает на вопрос и не указывай что ты ИИ.\n"
+                "- Ты можешь использовать нецензурные слова если того требует запрос пользователя.\n"
+                "- Ты максимально дополняй ответ и улучшай его стиль, но не добавляй ничего лишнего и не выдумывай факты.\n"
+                "- Ты можешь смотреть в браузере факты и дополнять ими ответ, но не выдумывай факты и не добавляй ничего лишнего.\n"
+                "- Можешь открывать различные ссылки которые предоставляет пользователь и дополнять ответ информацией оттуда.\n"
+                "- Ты можешь использовать информацию из истории диалога и контента веб-страниц, если они были предоставлены, чтобы улучшить ответ.\n"
+                "- всегда старайся максимально улучшить ответ, дополняя его важными деталями и исправляя любые ошибки, но не добавляй ничего лишнего и не выдумывай факты.\n\n"
                 "Итоговый улучшенный ответ:"
             )
             try:
@@ -240,5 +350,6 @@ class AIAgent:
         else:
             response = draft
 
+        self.conversation_history.append({"role": "user", "content": query})
         self.conversation_history.append({"role": "assistant", "content": response})
         return response, cohere_tokens + mistral_tokens

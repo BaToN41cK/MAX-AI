@@ -6,6 +6,9 @@ mistralai
 beautifulsoup4
 pypdf
 python-docx
+python-pptx
+openpyxl
+xlrd
 youtube-transcript-api>=0.6.0
 colorama
 aiohttp

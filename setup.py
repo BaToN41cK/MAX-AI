@@ -16,6 +16,9 @@ setup(
         "aiohttp",
         "PyPDF2>=3.0.0",
         "python-docx>=0.8.11",
+        "python-pptx>=0.6.23",
+        "openpyxl>=3.1.0",
+        "xlrd>=1.2.0",
         "youtube-transcript-api>=0.6.0",
     ],
     entry_points={
