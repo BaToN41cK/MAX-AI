@@ -44,3 +44,10 @@ class TestHandlers:
     async def test_docx_handler_detects_docx(self):
         handler = DocxHandler()
         assert await handler.can_handle("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "test.docx") is True
+
+    def test_summarize_small_content(self):
+        agent = AIAgent.__new__(AIAgent)
+        agent.cohere_client = None
+        agent.model_name = "command-a-03-2025"
+        small_text = "Короткий текст"
+        assert agent._summarize_content(small_text, "web") == small_text

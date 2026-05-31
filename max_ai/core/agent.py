@@ -9,7 +9,7 @@ import PyPDF2
 import docx
 import io
 import urllib.parse
-from max_ai.constants import URL_PATTERN, MAX_CONTENT_LENGTH
+from max_ai.constants import URL_PATTERN, MAX_CONTENT_LENGTH, SUMMARIZE_THRESHOLD
 
 try:
     from pptx import Presentation
@@ -201,6 +201,24 @@ class AIAgent:
     def clear_history(self) -> None:
         self.conversation_history = []
 
+    def _summarize_content(self, content: str, source_type: str) -> str:
+        if len(content) <= SUMMARIZE_THRESHOLD:
+            return content
+        
+        text_to_summarize = content[:SUMMARIZE_THRESHOLD]
+        summary_query = f"Суммаризируй следующий текст (тип: {source_type}):\n\n{text_to_summarize}"
+        
+        try:
+            summary_response = self.cohere_client.chat(
+                model=self.model_name,
+                messages=[{"role": "user", "content": summary_query}]
+            )
+            if summary_response.message.content and summary_response.message.content[0].text:
+                return summary_response.message.content[0].text + "\n\n[Текст был автоматически суммаризирован]"
+        except Exception:
+            pass
+        return content[:MAX_CONTENT_LENGTH]
+
     def extract_urls(self, text: str) -> list[str]:
         return URL_PATTERN.findall(text)
 
@@ -268,6 +286,8 @@ class AIAgent:
         if urls:
             results = self._run_async(self.fetch_urls_async(urls))
             for url, (content, source_type) in zip(urls, results):
+                if source_type != 'error':
+                    content = self._summarize_content(content, source_type)
                 content_parts.append(f"\n\n--- Содержание {url} (тип: {source_type}) ---\n{content}")
 
         if urls:
