@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from max_ai._constants import DOMAIN_PATTERN
+from max_ai.constants import DOMAIN_PATTERN
 
 @dataclass
 class AIResponse:

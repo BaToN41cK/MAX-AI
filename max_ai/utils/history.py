@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 from typing import Optional, List, Dict
 from max_ai.models.response import HistoryEntry
-from max_ai._constants import DOMAIN_PATTERN
+from max_ai.constants import DOMAIN_PATTERN
 
 DEFAULT_HISTORY_FILE = os.path.expanduser("~/.max_ai_history.json")
 

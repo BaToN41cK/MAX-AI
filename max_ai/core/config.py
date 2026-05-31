@@ -2,7 +2,9 @@ from dotenv import load_dotenv
 import os
 from typing import Optional
 
-load_dotenv()
+script_dir = os.path.dirname(os.path.abspath(__file__))
+env_path = os.path.join(script_dir, "..", "..", ".env")
+load_dotenv(env_path)
 
 class Config:
     def __init__(self) -> None:

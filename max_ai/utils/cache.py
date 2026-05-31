@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 from typing import Optional
 from max_ai.models.response import CacheEntry
-from max_ai._constants import MAX_CONTENT_LENGTH
+from max_ai.constants import MAX_CONTENT_LENGTH
 
 DEFAULT_CACHE_FILE = os.path.expanduser("~/.max_ai_cache.json")
 

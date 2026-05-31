@@ -30,8 +30,7 @@ class TestHandlers:
     @pytest.mark.asyncio
     async def test_html_handler(self):
         handler = HTMLHandler()
-        content = b"<html><body><p>Привет</p></body></html>"
-        text, source = await handler.handle(content, "https://example.com")
+        text, source = await handler.handle("<html><body><p>Привет</p></body></html>".encode('utf-8'), "https://example.com")
         assert "Привет" in text
         assert source == "web"
 

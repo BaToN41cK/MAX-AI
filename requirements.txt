@@ -4,9 +4,11 @@ click
 cohere
 mistralai
 beautifulsoup4
-PyPDF2>=3.0.0
-python-docx>=0.8.11
+pypdf
+python-docx
 youtube-transcript-api>=0.6.0
 colorama
 aiohttp
 rich
+pystray
+Pillow
