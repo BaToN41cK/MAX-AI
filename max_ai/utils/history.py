@@ -2,38 +2,39 @@ import json
 import os
 from datetime import datetime, timedelta
 from collections import defaultdict
-import re
+from typing import Optional, List, Dict
 from max_ai.models.response import HistoryEntry
+from max_ai._constants import DOMAIN_PATTERN
 
-HISTORY_FILE = os.path.expanduser("~/.max_ai_history.json")
-URL_PATTERN = re.compile(r'https?://[^/\s]+')
+DEFAULT_HISTORY_FILE = os.path.expanduser("~/.max_ai_history.json")
 
 
 class HistoryManager:
-    def __init__(self, history_file: str = HISTORY_FILE, max_entries: int = 100):
+    def __init__(self, history_file: str = DEFAULT_HISTORY_FILE, max_entries: int = 100) -> None:
         self.history_file = history_file
         self.max_entries = max_entries
-        self._entries = []
+        self._entries: list[HistoryEntry] = []
         self._load()
 
-    def _load(self):
-        if os.path.exists(self.history_file):
-            try:
-                with open(self.history_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    for e in data:
-                        self._entries.append(HistoryEntry(
-                            query=e.get('query', ''),
-                            response=e.get('response', ''),
-                            timestamp=e.get('timestamp', datetime.now().isoformat()),
-                            model_used=e.get('model_used', 'cohere'),
-                            estimated_tokens=e.get('estimated_tokens', 0),
-                            domains_visited=e.get('domains_visited', [])
-                        ))
-            except:
-                self._entries = []
+    def _load(self) -> None:
+        if not os.path.exists(self.history_file):
+            return
+        try:
+            with open(self.history_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                for e in data:
+                    self._entries.append(HistoryEntry(
+                        query=e.get('query', ''),
+                        response=e.get('response', ''),
+                        timestamp=e.get('timestamp', datetime.now().isoformat()),
+                        model_used=e.get('model_used', 'cohere'),
+                        estimated_tokens=e.get('estimated_tokens', 0),
+                        domains_visited=e.get('domains_visited', [])
+                    ))
+        except (json.JSONDecodeError, KeyError, ValueError):
+            self._entries = []
 
-    def _save(self):
+    def _save(self) -> None:
         data = [{
             'query': e.query,
             'response': e.response,
@@ -46,9 +47,9 @@ class HistoryManager:
         with open(self.history_file, 'w', encoding='utf-8') as f:
             json.dump(data[-self.max_entries:], f, ensure_ascii=False, indent=2)
 
-    def add(self, query: str, response: str, model_used: str = "cohere", tokens: int = 0):
-        domains = list(set(URL_PATTERN.findall(query)))
-        
+    def add(self, query: str, response: str, model_used: str = "cohere", tokens: int = 0) -> None:
+        domains = list(set(DOMAIN_PATTERN.findall(query)))
+
         self._entries.append(HistoryEntry(
             query=query,
             response=response,
@@ -59,24 +60,24 @@ class HistoryManager:
         ))
         self._save()
 
-    def get(self, limit: int = 10) -> list:
+    def get(self, limit: int = 10) -> List[dict]:
         return [e.__dict__ for e in self._entries[-limit:]]
 
-    def clear(self):
+    def clear(self) -> None:
         self._entries = []
         if os.path.exists(self.history_file):
             os.remove(self.history_file)
 
-    def get_stats(self, days: int = 7) -> dict:
+    def get_stats(self, days: int = 7) -> Dict:
         now = datetime.now()
         cutoff = now - timedelta(days=days)
-        
+
         total_requests = 0
         total_tokens = 0
-        model_counts = defaultdict(int)
-        domain_counts = defaultdict(int)
-        daily_counts = defaultdict(int)
-        
+        model_counts: Dict[str, int] = defaultdict(int)
+        domain_counts: Dict[str, int] = defaultdict(int)
+        daily_counts: Dict[str, int] = defaultdict(int)
+
         for entry in self._entries:
             try:
                 entry_time = datetime.fromisoformat(entry.timestamp)
@@ -88,12 +89,11 @@ class HistoryManager:
                         domain_counts[domain] += 1
                     daily_key = entry_time.strftime('%Y-%m-%d')
                     daily_counts[daily_key] += 1
-            except:
+            except (ValueError, TypeError):
                 continue
 
-        # Approximate cost: Cohere ~$0.001 per 1k tokens, Mistral ~$0.002
-        cost_estimate = (total_tokens / 1000) * 0.001  # Simplified
-        
+        cost_estimate = (total_tokens / 1000) * 0.001
+
         return {
             'total_requests': total_requests,
             'total_tokens': total_tokens,

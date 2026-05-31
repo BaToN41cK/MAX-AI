@@ -1,11 +1,13 @@
 import click
+from max_ai.core.config import config
 from max_ai.utils import HistoryManager
+from max_ai.utils.history import DEFAULT_HISTORY_FILE
 
 @click.command()
 @click.option('--limit', default=10, help='Number of history entries to show')
-def history(limit):
+def history(limit: int) -> None:
     """Show query history."""
-    history_mgr = HistoryManager()
+    history_mgr = HistoryManager(config.history_file or DEFAULT_HISTORY_FILE)
     entries = history_mgr.get(limit)
     if not entries:
         click.echo("История пуста")

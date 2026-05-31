@@ -1,8 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-import re
-
-URL_PATTERN = re.compile(r'https?://[^/\s]+')
+from max_ai._constants import DOMAIN_PATTERN
 
 @dataclass
 class AIResponse:
@@ -11,7 +9,7 @@ class AIResponse:
     timestamp: datetime
     cached: bool = False
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.content
 
 
@@ -34,6 +32,6 @@ class HistoryEntry:
     model_used: str = "cohere"
     estimated_tokens: int = 0
     domains_visited: list = field(default_factory=list)
-    
-    def get_domains(self) -> list:
-        return URL_PATTERN.findall(self.query) or []
+
+    def get_domains(self) -> list[str]:
+        return DOMAIN_PATTERN.findall(self.query) or []

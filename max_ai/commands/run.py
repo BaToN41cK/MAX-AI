@@ -2,24 +2,24 @@ import time
 import click
 import shutil
 import textwrap
+from typing import Optional
 from colorama import Fore, Style, init
 from rich.console import Console
 from max_ai.core import AIAgent
+from max_ai.core.config import config
 from max_ai.utils import CacheManager, HistoryManager
+from max_ai.utils.cache import DEFAULT_CACHE_FILE
+from max_ai.utils.history import DEFAULT_HISTORY_FILE
 
-# Initialize colorama
 init()
-
 console = Console()
 
-def wrapped_print(text: str, width: int = None, color: str = None, source_type: str = None):
-    """Выводит текст с переносами по словам, подгоняя под ширину терминала."""
+def wrapped_print(text: Optional[str], width: Optional[int] = None, color: Optional[str] = None, source_type: Optional[str] = None) -> None:
     if text is None:
         text = ''
     if width is None:
         width = shutil.get_terminal_size().columns
     
-    # Add source type badge
     if source_type:
         colors = {
             'web': Fore.BLUE,
@@ -30,7 +30,6 @@ def wrapped_print(text: str, width: int = None, color: str = None, source_type: 
         }
         click.echo(colors.get(source_type, Fore.WHITE) + f"[{source_type.upper()}] " + Style.RESET_ALL, end='')
     
-    # Разбиваем на абзацы (по пустым строкам) и обрабатываем каждый
     paragraphs = text.split('\n')
     for para in paragraphs:
         if para.strip() == '':
@@ -47,11 +46,12 @@ def wrapped_print(text: str, width: int = None, color: str = None, source_type: 
 @click.option('--no-cache', is_flag=True, help='Do not use cache')
 @click.option('--cohere-key', help='Specify which Cohere API key to use')
 @click.option('--ttl', default=3600, help='Cache TTL in seconds')
-def run(query, no_cache, cohere_key, ttl):
+@click.option('--model', help='Cohere model to use (default: command-a-03-2025)')
+def run(query, no_cache, cohere_key, ttl, model):
     """Run a query against the AI agent."""
-    agent = AIAgent(cohere_key=cohere_key)
-    cache_mgr = CacheManager()
-    history_mgr = HistoryManager()
+    agent = AIAgent(cohere_key=cohere_key, model=model)
+    cache_mgr = CacheManager(config.cache_file or DEFAULT_CACHE_FILE)
+    history_mgr = HistoryManager(config.history_file or DEFAULT_HISTORY_FILE)
 
     if not no_cache:
         cached = cache_mgr.get(query)
@@ -76,9 +76,11 @@ def run(query, no_cache, cohere_key, ttl):
     if not no_cache:
         cache_mgr.set(query, response, ttl)
 
-    # Determine which model was used
     model_used = "cohere"
-    is_mistral_enhanced = "[Примечание: не удалось улучшить ответ через Mistral" not in str(response) and "Mistral" in str(response)
+    is_mistral_enhanced = (
+        "[Примечание: не удалось улучшить ответ через Mistral" not in str(response)
+        and "Mistral" in str(response)
+    )
     if agent.mistral_client and is_mistral_enhanced:
         model_used = "mistral-enhanced"
     
