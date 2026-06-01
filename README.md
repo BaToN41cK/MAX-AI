@@ -317,12 +317,14 @@ max_ai/
 ├── cli.py              # Точка входа, группа команд click
 ├── core/
 │   ├── agent.py        # Основной AI агент
-│   └── config.py       # Конфигурация и управление ключами
+│   ├── config.py       # Конфигурация и управление ключами
+│   └── logging_config.py  # Настройка логгирования
 ├── commands/
 │   ├── run.py          # Команда run
 │   ├── history.py      # Команда history
 │   ├── cache.py        # Команда cache-clear
 │   └── status.py       # Команда status (со статистикой)
+├── constants.py        # Константы проекта (URL паттерны, лимиты и т.д.)
 ├── utils/
 │   ├── cache.py        # Менеджер кеша
 │   └── history.py      # Менеджер истории

@@ -4,7 +4,7 @@ click
 cohere
 mistralai
 beautifulsoup4
-pypdf
+PyPDF2>=3.0.0
 python-docx
 python-pptx
 openpyxl

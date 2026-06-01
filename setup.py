@@ -20,6 +20,7 @@ setup(
         "openpyxl>=3.1.0",
         "xlrd>=1.2.0",
         "youtube-transcript-api>=0.6.0",
+        "PyYAML",
     ],
     entry_points={
         "console_scripts": [
