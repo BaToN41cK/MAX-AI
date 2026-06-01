@@ -1,4 +1,5 @@
 import click
+from rich import box
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
@@ -16,28 +17,57 @@ def status(days: int) -> None:
     """Check status and show usage statistics."""
     console.print(Panel.fit(
         "[bold blue]MAX-AI Status[/bold blue]",
-        border_style="blue"
+        border_style="blue",
+        box=box.ROUNDED,
     ))
     
     cohere_status = Text("configured", style="bold green") if config.cohere_api_key else Text("missing", style="bold red")
     mistral_status = Text("configured", style="bold green") if config.mistral_api_key else Text("not set", style="bold yellow")
-    click.echo(f"API: Cohere={cohere_status}, Mistral={mistral_status}")
+    console.print(Panel(
+        f"[bold]Cohere API:[/bold] {cohere_status}\n[bold]Mistral API:[/bold] {mistral_status}",
+        title="[bold]API Configuration[/bold]",
+        border_style="cyan",
+        box=box.ROUNDED,
+    ))
     
     history_file = config.history_file or DEFAULT_HISTORY_FILE
     history_mgr = HistoryManager(history_file=history_file)
     stats_data = history_mgr.get_stats(days=days)
     
-    table = Table(title=f"Usage Statistics (last {days} days)")
-    table.add_column("Metric", style="cyan")
-    table.add_column("Value", style="green")
-    table.add_row("Total Requests", str(stats_data['total_requests']))
-    table.add_row("Total Tokens", f"{stats_data['total_tokens']:,}")
-    table.add_row("Estimated Cost (USD)", f"${stats_data['cost_estimate_usd']:.4f}")
-    console.print(table)
-    
+    # Compact summary panel replacing the large usage tables
+    summary = Text()
+    summary.append(f"Total Requests: ", style="cyan")
+    summary.append(f"{stats_data['total_requests']}\n", style="bold green")
+    summary.append(f"Total Tokens: ", style="cyan")
+    summary.append(f"{stats_data['total_tokens']:,}\n", style="green")
+    summary.append(f"Average Tokens: ", style="cyan")
+    summary.append(f"{stats_data['average_tokens']:.1f}\n", style="green")
+    summary.append(f"Unique Domains: ", style="cyan")
+    summary.append(f"{stats_data['unique_domains']}\n", style="green")
+    summary.append(f"Estimated Cost: ", style="cyan")
+    summary.append(f"${stats_data['cost_estimate_usd']:.4f}\n", style="green")
+
+    # Model usage as a compact inline list
+    if stats_data['model_usage']:
+        models = ", ".join([f"{m} ({c})" for m, c in stats_data['model_usage'].items()])
+        summary.append("\nModel usage: ", style="magenta")
+        summary.append(models, style="magenta")
+
+    console.print(Panel(summary, title=f"Usage Summary ({days} days)", border_style="bright_blue", box=box.SQUARE))
+
+    # Top domains: show a concise list if available
+    if stats_data['top_domains']:
+        dom_text = Text()
+        for domain, count in stats_data['top_domains']:
+            dom_text.append(f"{domain}: ", style="cyan")
+            dom_text.append(f"{count}\n", style="green")
+        console.print(Panel(dom_text, title="Top Domains", border_style="magenta", box=box.SQUARE))
+
+    # Daily breakdown: compact progress bars for recent days
     if stats_data['daily_breakdown']:
-        click.echo("\n[bold]Requests by day:[/bold]")
-        with Progress(BarColumn(), TextColumn("[progress.description]{task.description}"), console=console) as progress:
+        console.rule("[bold yellow]Requests by day (recent)[/bold yellow]")
+        with Progress(BarColumn(bar_width=40), TextColumn("[progress.description]{task.description}"), console=console) as progress:
+            max_value = max(stats_data['daily_breakdown'].values(), default=1)
             for day, count in list(stats_data['daily_breakdown'].items())[-7:]:
-                bar = progress.add_task(day, total=max(stats_data['daily_breakdown'].values(), default=1))
+                bar = progress.add_task(day, total=max_value)
                 progress.update(bar, completed=count)

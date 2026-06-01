@@ -10,7 +10,7 @@ import PyPDF2
 import docx
 import io
 import urllib.parse
-from max_ai.constants import URL_PATTERN, MAX_CONTENT_LENGTH, SUMMARIZE_THRESHOLD
+from max_ai.constants import URL_PATTERN, DEFAULT_MAX_CONTENT_LENGTH, SUMMARIZE_THRESHOLD
 
 URL_VALIDATION_PATTERN = re.compile(r'^https?://[^\s/$.?#].[^\s]*$')
 
@@ -54,7 +54,7 @@ class PDFHandler(BaseHandler):
                 page_text = page.extract_text()
                 if page_text:
                     text += page_text + "\n"
-            return text[:MAX_CONTENT_LENGTH], 'pdf'
+            return text[:config.get("max_content_length", DEFAULT_MAX_CONTENT_LENGTH)], 'pdf'
         except PyPDF2.errors.PdfReadError as e:
             return f"Ошибка чтения PDF {url}: {str(e)}", 'error'
         except Exception as e:
@@ -72,7 +72,7 @@ class DocxHandler(BaseHandler):
             for paragraph in doc.paragraphs:
                 if paragraph.text:
                     text += paragraph.text + "\n"
-            return text[:MAX_CONTENT_LENGTH], 'docx'
+            return text[:config.get("max_content_length", DEFAULT_MAX_CONTENT_LENGTH)], 'docx'
         except Exception as e:
             return f"Ошибка обработки DOCX {url}: {str(e)}", 'error'
 
@@ -92,7 +92,7 @@ class PptxHandler(BaseHandler):
                 for shape in slide.shapes:
                     if hasattr(shape, "text") and shape.text:
                         text += shape.text + "\n"
-            return text[:MAX_CONTENT_LENGTH], 'pptx'
+            return text[:config.get("max_content_length", DEFAULT_MAX_CONTENT_LENGTH)], 'pptx'
         except Exception as e:
             return f"Ошибка обработки PPTX {url}: {str(e)}", 'error'
 
@@ -115,7 +115,7 @@ class XlsxHandler(BaseHandler):
                     if row_text.strip():
                         text += row_text + "\n"
             wb.close()
-            return text[:MAX_CONTENT_LENGTH], 'xlsx'
+            return text[:config.get("max_content_length", DEFAULT_MAX_CONTENT_LENGTH)], 'xlsx'
         except Exception as e:
             return f"Ошибка обработки XLSX {url}: {str(e)}", 'error'
 
@@ -136,7 +136,7 @@ class XlsHandler(BaseHandler):
                     row_text = "\t".join(str(cell.value) for cell in row)
                     if row_text.strip():
                         text += row_text + "\n"
-            return text[:MAX_CONTENT_LENGTH], 'xls'
+            return text[:config.get("max_content_length", DEFAULT_MAX_CONTENT_LENGTH)], 'xls'
         except ImportError:
             return f"Ошибка: библиотека xlrd не установлена для обработки XLS {url}", 'error'
         except Exception as e:
@@ -153,7 +153,7 @@ class TxtHandler(BaseHandler):
     async def handle(self, content: bytes, url: str) -> tuple[str, str]:
         try:
             text = content.decode('utf-8', errors='ignore')
-            return text[:MAX_CONTENT_LENGTH], 'text'
+            return text[:config.get("max_content_length", DEFAULT_MAX_CONTENT_LENGTH)], 'text'
         except Exception as e:
             return f"Ошибка обработки текстового файла {url}: {str(e)}", 'error'
 
@@ -169,7 +169,7 @@ class HTMLHandler(BaseHandler):
             for script in soup(["script", "style"]):
                 script.decompose()
             text = soup.get_text(separator='\n', strip=True)
-            return text[:MAX_CONTENT_LENGTH], 'web'
+            return text[:config.get("max_content_length", DEFAULT_MAX_CONTENT_LENGTH)], 'web'
         except UnicodeDecodeError as e:
             return f"Ошибка декодирования страницы {url}: {str(e)}", 'error'
         except Exception as e:
@@ -225,7 +225,7 @@ class AIAgent:
                 return summary_response.message.content[0].text + "\n\n[Текст был автоматически суммаризирован]"
         except Exception:
             pass
-        return content[:MAX_CONTENT_LENGTH]
+        return content[:config.get("max_content_length", DEFAULT_MAX_CONTENT_LENGTH)]
 
     def extract_urls(self, text: str) -> list[str]:
         urls = URL_PATTERN.findall(text)
@@ -254,7 +254,7 @@ class AIAgent:
                     from youtube_transcript_api import YouTubeTranscriptApi
                     transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['ru', 'en'])
                     text = ' '.join([item['text'] for item in transcript_list])
-                    return text[:MAX_CONTENT_LENGTH], 'youtube'
+                    return text[:config.get("max_content_length", DEFAULT_MAX_CONTENT_LENGTH)], 'youtube'
             except (ImportError, AttributeError, Exception):
                 pass
 

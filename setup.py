@@ -9,6 +9,7 @@ setup(
         "requests",
         "python-dotenv",
         "click",
+        "colorama",
         "cohere",
         "mistralai",
         "beautifulsoup4",

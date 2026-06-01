@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Simple shim to run MAX-AI CLI when repository is unzipped on Unix-like systems
+DIR="$(cd "$(dirname "$0")" && pwd)"
+python -m max_ai.cli "$@"

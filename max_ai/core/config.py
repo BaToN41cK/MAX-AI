@@ -24,10 +24,16 @@ class Config:
     def __init__(self) -> None:
         self.cohere_api_key = os.getenv("COHERE_API_KEY", "")
         self.mistral_api_key = os.getenv("MISTRAL_API_KEY", "")
-        self.cache_file: Optional[str] = os.getenv("MAX_AI_CACHE_FILE")
-        self.history_file: Optional[str] = os.getenv("MAX_AI_HISTORY_FILE")
         self._config_file = os.path.join(script_dir, "..", "..", "max-ai.yaml")
         self._config: Dict[str, Any] = self._load_yaml_config()
+        self.cache_file = self._resolve_path("MAX_AI_CACHE_FILE", "cache_file")
+        self.history_file = self._resolve_path("MAX_AI_HISTORY_FILE", "history_file")
+    
+    def _resolve_path(self, env_var: str, yaml_key: str) -> Optional[str]:
+        value = os.getenv(env_var, "") or self._config.get(yaml_key, "")
+        if value:
+            return os.path.expanduser(value)
+        return None
     
     def _load_yaml_config(self) -> Dict[str, Any]:
         if os.path.exists(self._config_file):

@@ -6,6 +6,39 @@
 
 MAX-AI - это CLI инструмент, который позволяет взаимодействовать с искусственным интеллектом через терминал. Особенность - автоматическое извлечение и чтение URL из запросов.
 
+## Быстрый старт
+
+1. Склонируйте репозиторий или скачайте ZIP и распакуйте его:
+
+```bash
+git clone https://github.com/yourusername/max-ai.git
+cd max-ai
+```
+
+2. Создайте виртуальное окружение и установите зависимости (опционально):
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Unix/macOS
+.\.venv\Scripts\Activate   # Windows PowerShell
+pip install -e .
+```
+
+3. Скопируйте файл `.env.example` в `.env` и заполните `COHERE_API_KEY` (и опционально `MISTRAL_API_KEY`):
+
+```bash
+cp .env.example .env
+# Откройте .env и вставьте ваши ключи
+```
+
+4. Запустите команду:
+
+```bash
+max-ai run "Привет, как дела?"
+```
+
+Примечание по безопасности: не коммитьте файл `.env` с вашими ключами в публичные репозитории. Файл `.env.example` служит как шаблон.
+
 ### Зачем нужен и чем полезен
 
 - **Быстрый доступ к AI**: Не нужно открывать браузер - получайте ответы сразу в терминале
@@ -235,6 +268,32 @@ max-ai cache-clear
 # Проверить статус (с метриками)
 max-ai status                 # Статистика за последнюю неделю
 max-ai status --days 30       # Статистика за последний месяц
+
+## Запуск без установки (из распакованного архива)
+
+Если вы скачали репозиторий и распаковали его локально, не обязательно ставить пакет через `pip` — можно запускать CLI прямо из корня проекта.
+
+Unix / macOS:
+
+- Сделать файл-шиф `max-ai` исполняемым и вызвать его:
+
+```bash
+chmod +x ./max-ai
+./max-ai run "Привет, как дела?"
+# или запустить через модуль
+python -m max_ai.cli run "Привет, как дела?"
+```
+
+Windows (PowerShell / cmd):
+
+- Используйте `max-ai.bat` из корня проекта. Скрипт запускает CLI при передаче аргументов:
+
+```powershell
+.\max-ai.bat run "Привет, как дела?"
+.\max-ai.bat --help
+```
+
+Эти способы позволяют быстро запустить инструмент сразу после распаковки архива без дополнительной установки.
 ```
 
 ## Examples
@@ -335,3 +394,44 @@ max_ai/
 ## License
 
 MIT
+
+## Persisting to a SQLite `.db`
+
+By default MAX-AI uses JSON files for cache and history. You can switch to SQLite by setting the file paths to end with `.db`.
+
+Example `.env` entries (see `.env.example`):
+
+- `MAX_AI_CACHE_FILE=~/.max_ai_cache.db`
+- `MAX_AI_HISTORY_FILE=~/.max_ai_history.db`
+
+When a path ends with `.db`, the project will create the SQLite file and store records in compact tables. This is more robust for larger histories and safer against concurrent writes.
+
+Tip: put your `.env` in the project root or set environment variables in your shell.
+
+## Установка из GitHub (быстрая проверка без PyPI)
+
+Вы можете установить пакет напрямую из GitHub, тогда `max-ai` станет доступной командой в системе:
+
+```bash
+pip install "git+https://github.com/yourusername/max-ai.git"
+```
+
+После установки `max-ai` будет доступна как системная команда. Если вы не хотите устанавливать, смотрите раздел "Запуск без установки".
+
+## Тесты и разработка
+
+Запустить тесты локально:
+
+```bash
+python -m pytest
+```
+
+Если вы планируете вносить изменения, используйте виртуальное окружение и установите зависимости в editable режиме:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .[dev]
+```
+
+Где `[dev]` может включать тестовые зависимости (при необходимости добавьте их в `setup.py` или `requirements-dev.txt`).

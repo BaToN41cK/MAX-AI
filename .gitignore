@@ -127,6 +127,10 @@ data/*
 # So we can ignore everything in data.
 data/**
 
+# Project env and secrets
+.env
+.env.local
+
 # Logs
 logs/
 *.log

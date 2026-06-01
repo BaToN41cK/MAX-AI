@@ -13,6 +13,4 @@ youtube-transcript-api>=0.6.0
 colorama
 aiohttp
 rich
-pystray
-Pillow
 PyYAML
