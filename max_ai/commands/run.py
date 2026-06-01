@@ -5,7 +5,6 @@ import textwrap
 from typing import Optional
 from colorama import Fore, Style, init
 from rich.console import Console
-from rich.progress import Progress, BarColumn, TextColumn
 from max_ai.core import AIAgent
 from max_ai.core.config import config
 from max_ai.utils import CacheManager, HistoryManager
@@ -66,15 +65,10 @@ def run(query, no_cache, cohere_key, ttl, model):
         urls = agent.extract_urls(query)
     
     if urls:
-        with Progress(
-            TextColumn("[bold yellow]Загрузка URL:"),
-            BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            console=console
-        ) as progress:
-            task = progress.add_task("", total=len(urls))
-            for url in urls:
-                progress.advance(task)
+        console.print(f"\n[bold cyan]Найдено URL:[/bold cyan] {len(urls)}")
+        for i, url in enumerate(urls, 1):
+            console.print(f"  {i}. [blue]{url}[/blue]")
+        with console.status("[bold yellow]Загрузка URL...[/bold yellow]", spinner="dots"):
             response, tokens = agent.run(query)
     else:
         with console.status("[bold green]Получение ответа от AI...[/bold green]", spinner="dots"):

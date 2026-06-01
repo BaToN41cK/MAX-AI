@@ -2,6 +2,8 @@ import click
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
+from rich.progress import BarColumn, Progress, TextColumn
+from rich.text import Text
 from max_ai.core.config import config
 from max_ai.utils import HistoryManager
 from max_ai.utils.history import DEFAULT_HISTORY_FILE
@@ -17,8 +19,9 @@ def status(days: int) -> None:
         border_style="blue"
     ))
     
-    click.echo(f"Status: OK")
-    click.echo(f"API keys: Cohere={'configured' if config.cohere_api_key else 'missing'}, Mistral={'configured' if config.mistral_api_key else 'missing'}")
+    cohere_status = Text("configured", style="bold green") if config.cohere_api_key else Text("missing", style="bold red")
+    mistral_status = Text("configured", style="bold green") if config.mistral_api_key else Text("not set", style="bold yellow")
+    click.echo(f"API: Cohere={cohere_status}, Mistral={mistral_status}")
     
     history_file = config.history_file or DEFAULT_HISTORY_FILE
     history_mgr = HistoryManager(history_file=history_file)
@@ -31,3 +34,10 @@ def status(days: int) -> None:
     table.add_row("Total Tokens", f"{stats_data['total_tokens']:,}")
     table.add_row("Estimated Cost (USD)", f"${stats_data['cost_estimate_usd']:.4f}")
     console.print(table)
+    
+    if stats_data['daily_breakdown']:
+        click.echo("\n[bold]Requests by day:[/bold]")
+        with Progress(BarColumn(), TextColumn("[progress.description]{task.description}"), console=console) as progress:
+            for day, count in list(stats_data['daily_breakdown'].items())[-7:]:
+                bar = progress.add_task(day, total=max(stats_data['daily_breakdown'].values(), default=1))
+                progress.update(bar, completed=count)
