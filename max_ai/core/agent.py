@@ -182,7 +182,8 @@ class AIAgent:
         if not cohere_key_str:
             raise ValueError("Cohere API key is required. Set COHERE_API_KEY or pass --cohere-key.")
         self.cohere_client = cohere.ClientV2(cohere_key_str)
-        self.model_name = model or "command-a-03-2025"
+        self.model_name = model or config.get("cohere_model", "command-a-03-2025")
+        self.mistral_model = config.get("mistral_model", "mistral-large-latest")
         self.mistral_client: Optional[Mistral] = None
         mistral_api_key = config.get_mistral_key(mistral_key)
         if mistral_api_key and Mistral is not None:
@@ -200,16 +201,19 @@ class AIAgent:
             HTMLHandler()
         ]
         self.conversation_history: list[dict[str, str]] = []
-        self._rate_limiter = asyncio.Semaphore(5)
+        self._rate_limiter = asyncio.Semaphore(config.get("rate_limit", 5))
+        self._timeout = config.get("timeout", 30)
+        self._max_retries = config.get("max_retries", 3)
 
     def clear_history(self) -> None:
         self.conversation_history = []
 
     def _summarize_content(self, content: str, source_type: str) -> str:
-        if len(content) <= SUMMARIZE_THRESHOLD:
+        threshold = config.get("summarize_threshold", SUMMARIZE_THRESHOLD)
+        if len(content) <= threshold:
             return content
         
-        text_to_summarize = content[:SUMMARIZE_THRESHOLD]
+        text_to_summarize = content[:threshold]
         summary_query = f"Суммаризируй следующий текст (тип: {source_type}):\n\n{text_to_summarize}"
         
         try:
@@ -231,10 +235,9 @@ class AIAgent:
         if not URL_VALIDATION_PATTERN.match(url):
             return f"Невалидный URL: {url}", 'error'
         
-        async with self._rate_limiter:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
 
         if 'youtube.com' in url.lower() or 'youtu.be' in url.lower():
             try:
@@ -253,31 +256,31 @@ class AIAgent:
                     text = ' '.join([item['text'] for item in transcript_list])
                     return text[:MAX_CONTENT_LENGTH], 'youtube'
             except (ImportError, AttributeError, Exception):
-                # Fall through to regular processing if YouTube API fails
                 pass
 
         last_error: Optional[Exception] = None
-        for attempt in range(retries):
+        for attempt in range(self._max_retries):
             try:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=30), headers=headers) as response:
-                    response.raise_for_status()
-                    content = await response.read()
-                    content_type = response.headers.get('content-type', '').lower()
+                async with self._rate_limiter:
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=self._timeout), headers=headers) as response:
+                        response.raise_for_status()
+                        content = await response.read()
+                        content_type = response.headers.get('content-type', '').lower()
 
-                    for handler in self.handlers:
-                        if await handler.can_handle(content_type, url):
-                            return await handler.handle(content, url)
+                        for handler in self.handlers:
+                            if await handler.can_handle(content_type, url):
+                                return await handler.handle(content, url)
 
-                    return f"Не удалось обработать содержимое {url}: неизвестный тип контента", 'error'
+                        return f"Не удалось обработать содержимое {url}: неизвестный тип контента", 'error'
             except aiohttp.ClientError as e:
                 last_error = e
             except Exception as e:
                 last_error = e
             
-            if attempt < retries - 1:
+            if attempt < self._max_retries - 1:
                 await asyncio.sleep(0.5 * (2 ** attempt))
 
-        return f"Ошибка загрузки {url} после {retries} попыток: {str(last_error)}", 'error'
+        return f"Ошибка загрузки {url} после {self._max_retries} попыток: {str(last_error)}", 'error'
 
     async def fetch_urls_async(self, urls: list[str]) -> list[tuple[str, str]]:
         async with aiohttp.ClientSession() as session:

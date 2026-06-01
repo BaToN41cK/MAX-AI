@@ -15,3 +15,4 @@ aiohttp
 rich
 pystray
 Pillow
+PyYAML

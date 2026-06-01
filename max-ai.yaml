@@ -1,0 +1,10 @@
+cohere_model: "command-a-03-2025"
+mistral_model: "mistral-large-latest"
+max_content_length: 50000
+summarize_threshold: 40000
+cache_ttl: 3600
+timeout: 30
+max_retries: 3
+rate_limit: 5
+system_prompt: "Ты — полезный ассистент."
+mistral_system_prompt: "Ты — опытный ассистент, который улучшает ответы."

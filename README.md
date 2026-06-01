@@ -179,6 +179,23 @@ COHERE_API_KEY=your_cohere_api_key
 MISTRAL_API_KEY=your_mistral_api_key  # опционально
 ```
 
+## Конфигурация (max-ai.yaml)
+
+Создайте файл `max-ai.yaml` в директории проекта для настройки:
+
+```yaml
+cohere_model: "command-a-03-2025"      # Модель Cohere
+mistral_model: "mistral-large-latest"    # Модель Mistral
+max_content_length: 50000               # Максимальный размер контента
+summarize_threshold: 40000              # Порог для автоматической суммаризации
+cache_ttl: 3600                         # Время жизни кеша в секундах
+timeout: 30                             # Таймаут запросов
+max_retries: 3                          # Максимум попыток retry
+rate_limit: 5                           # Одновременные запросы к URL
+system_prompt: "Ты — полезный ассистент."
+mistral_system_prompt: "Ты — опытный ассистент, который улучшает ответы."
+```
+
 ## Использование
 
 ```bash
