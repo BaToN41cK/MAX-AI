@@ -3,13 +3,12 @@ from setuptools import setup, find_packages
 setup(
     name="max-ai",
     version="0.1.0",
-    package_dir={"": "."},
-    packages=find_packages(include=["max_ai", "max_ai.*"]),
+    package_dir={"": "../src"},
+    packages=find_packages(where=["../src"], include=["max_ai", "max_ai.*"]),
     install_requires=[
         "requests",
         "python-dotenv",
         "click",
-        "colorama",
         "cohere",
         "mistralai",
         "beautifulsoup4",
@@ -21,6 +20,7 @@ setup(
         "openpyxl>=3.1.0",
         "xlrd>=1.2.0",
         "youtube-transcript-api>=0.6.0",
+        "yt-dlp",
         "PyYAML",
     ],
     entry_points={

@@ -1,0 +1,235 @@
+Defaulting to user installation because normal site-packages is not writeable
+Obtaining file:///C:/Users/user/Desktop/MAX-AI/project
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Checking if build backend supports build_editable: started
+  Checking if build backend supports build_editable: finished with status 'done'
+  Getting requirements to build editable: started
+  Getting requirements to build editable: finished with status 'error'
+  error: subprocess-exited-with-error
+  
+  Getting requirements to build editable did not run successfully.
+  exit code: 1
+  
+  [214 lines of output]
+  configuration error: `tool.setuptools.packages` must be valid exactly by one definition (0 matches found):
+  
+      - type: array
+        items:
+          type: string
+          at least one of the following:
+            - {type: string, format: 'python-module-name-relaxed'}
+            - {type: string, format: 'pep561-stub-name'}
+      - type: table
+        additional keys: False
+        keys:
+          'find':
+            type: table
+            additional keys: False
+            keys:
+              'where':
+                type: array
+                items: {type: string}
+              'exclude':
+                type: array
+                items: {type: string}
+              'include':
+                type: array
+                items: {type: string}
+              'namespaces': {type: boolean}
+  
+  DESCRIPTION:
+      Packages that should be included in the distribution. It can be given either
+      as a list of package identifiers or as a ``dict``-like structure with a
+      single key ``find`` which corresponds to a dynamic call to
+      ``setuptools.config.expand.find_packages`` function. The ``find`` key is
+      associated with a nested ``dict``-like structure that can contain ``where``,
+      ``include``, ``exclude`` and ``namespaces`` keys, mimicking the keyword
+      arguments of the associated function.
+  
+  GIVEN VALUE:
+      {
+          "find": {
+              "where": [
+                  "src"
+              ],
+              "include": [
+                  "max_ai",
+                  "max_ai.*"
+              ],
+              "dependencies": [
+                  "requests",
+                  "python-dotenv",
+                  "click",
+                  "cohere",
+                  "mistralai",
+                  "beautifulsoup4",
+                  "rich",
+                  "aiohttp",
+                  "PyPDF2>=3.0.0",
+                  "python-docx>=0.8.11",
+                  "python-pptx>=0.6.23",
+                  "openpyxl>=3.1.0",
+                  "xlrd>=1.2.0",
+                  "youtube-transcript-api>=0.6.0",
+                  "yt-dlp",
+                  "PyYAML"
+              ]
+          }
+      }
+  
+  OFFENDING RULE: 'oneOf'
+  
+  DEFINITION:
+      {
+          "oneOf": [
+              {
+                  "title": "Array of Python package identifiers",
+                  "type": "array",
+                  "items": {
+                      "$id": "#/definitions/package-name",
+                      "title": "Valid package name",
+                      "description": "Valid package name (importable or :pep:`561`).",
+                      "type": "string",
+                      "anyOf": [
+                          {
+                              "type": "string",
+                              "format": "python-module-name-relaxed"
+                          },
+                          {
+                              "type": "string",
+                              "format": "pep561-stub-name"
+                          }
+                      ]
+                  }
+              },
+              {
+                  "$id": "#/definitions/find-directive",
+                  "title": "'find:' directive",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                      "find": {
+                          "type": "object",
+                          "$$description": [
+                              "Dynamic `package discovery",
+                              "<https://setuptools.pypa.io/en/latest/userguide/package_discovery.html>`_."
+                          ],
+                          "additionalProperties": false,
+                          "properties": {
+                              "where": {
+                                  "description": "Directories to be searched for packages (Unix-style relative path)",
+                                  "type": "array",
+                                  "items": {
+                                      "type": "string"
+                                  }
+                              },
+                              "exclude": {
+                                  "type": "array",
+                                  "$$description": [
+                                      "Exclude packages that match the values listed in this field.",
+                                      "Can container shell-style wildcards (e.g. ``'pkg.*'``)"
+                                  ],
+                                  "items": {
+                                      "type": "string"
+                                  }
+                              },
+                              "include": {
+                                  "type": "array",
+                                  "$$description": [
+                                      "Restrict the found packages to just the ones listed in this field.",
+                                      "Can container shell-style wildcards (e.g. ``'pkg.*'``)"
+                                  ],
+                                  "items": {
+                                      "type": "string"
+                                  }
+                              },
+                              "namespaces": {
+                                  "type": "boolean",
+                                  "$$description": [
+                                      "When ``True``, directories without a ``__init__.py`` file will also",
+                                      "be scanned for :pep:`420`-style implicit namespaces"
+                                  ]
+                              }
+                          }
+                      }
+                  }
+              }
+          ]
+      }
+  
+  For more details about `format` see
+  https://validate-pyproject.readthedocs.io/en/latest/api/validate_pyproject.formats.html
+  
+  Traceback (most recent call last):
+    File "C:\Users\user\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\pip\_vendor\pyproject_hooks\_in_process\_in_process.py", line 389, in <module>
+      main()
+      ~~~~^^
+    File "C:\Users\user\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\pip\_vendor\pyproject_hooks\_in_process\_in_process.py", line 373, in main
+      json_out["return_val"] = hook(**hook_input["kwargs"])
+                               ~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+    File "C:\Users\user\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\pip\_vendor\pyproject_hooks\_in_process\_in_process.py", line 157, in get_requires_for_build_editable
+      return hook(config_settings)
+    File "C:\Users\user\AppData\Local\Temp\pip-build-env-tr5kdseb\overlay\Lib\site-packages\setuptools\build_meta.py", line 481, in get_requires_for_build_editable
+      return self.get_requires_for_build_wheel(config_settings)
+             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+    File "C:\Users\user\AppData\Local\Temp\pip-build-env-tr5kdseb\overlay\Lib\site-packages\setuptools\build_meta.py", line 333, in get_requires_for_build_wheel
+      return self._get_build_requires(config_settings, requirements=[])
+             ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    File "C:\Users\user\AppData\Local\Temp\pip-build-env-tr5kdseb\overlay\Lib\site-packages\setuptools\build_meta.py", line 301, in _get_build_requires
+      self.run_setup()
+      ~~~~~~~~~~~~~~^^
+    File "C:\Users\user\AppData\Local\Temp\pip-build-env-tr5kdseb\overlay\Lib\site-packages\setuptools\build_meta.py", line 317, in run_setup
+      exec(code, locals())
+      ~~~~^^^^^^^^^^^^^^^^
+    File "<string>", line 3, in <module>
+    File "C:\Users\user\AppData\Local\Temp\pip-build-env-tr5kdseb\overlay\Lib\site-packages\setuptools\__init__.py", line 117, in setup
+      return distutils.core.setup(**attrs)  # type: ignore[return-value]
+             ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+    File "C:\Users\user\AppData\Local\Temp\pip-build-env-tr5kdseb\overlay\Lib\site-packages\setuptools\_distutils\core.py", line 160, in setup
+      dist.parse_config_files()
+      ~~~~~~~~~~~~~~~~~~~~~~~^^
+    File "C:\Users\user\AppData\Local\Temp\pip-build-env-tr5kdseb\overlay\Lib\site-packages\setuptools\dist.py", line 762, in parse_config_files
+      pyprojecttoml.apply_configuration(self, filename, ignore_option_errors)
+      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    File "C:\Users\user\AppData\Local\Temp\pip-build-env-tr5kdseb\overlay\Lib\site-packages\setuptools\config\pyprojecttoml.py", line 72, in apply_configuration
+      config = read_configuration(filepath, True, ignore_option_errors, dist)
+    File "C:\Users\user\AppData\Local\Temp\pip-build-env-tr5kdseb\overlay\Lib\site-packages\setuptools\config\pyprojecttoml.py", line 149, in read_configuration
+      validate(subset, filepath)
+      ~~~~~~~~^^^^^^^^^^^^^^^^^^
+    File "C:\Users\user\AppData\Local\Temp\pip-build-env-tr5kdseb\overlay\Lib\site-packages\setuptools\config\pyprojecttoml.py", line 61, in validate
+      raise ValueError(f"{error}\n{summary}") from None
+  ValueError: invalid pyproject.toml config: `tool.setuptools.packages`.
+  configuration error: `tool.setuptools.packages` must be valid exactly by one definition (0 matches found):
+  
+      - type: array
+        items:
+          type: string
+          at least one of the following:
+            - {type: string, format: 'python-module-name-relaxed'}
+            - {type: string, format: 'pep561-stub-name'}
+      - type: table
+        additional keys: False
+        keys:
+          'find':
+            type: table
+            additional keys: False
+            keys:
+              'where':
+                type: array
+                items: {type: string}
+              'exclude':
+                type: array
+                items: {type: string}
+              'include':
+                type: array
+                items: {type: string}
+              'namespaces': {type: boolean}
+  
+  [end of output]
+  
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+
+[notice] A new release of pip is available: 26.1.1 -> 26.1.2
+[notice] To update, run: C:\Users\user\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\python.exe -m pip install --upgrade pip
+ERROR: Failed to build 'file:///C:/Users/user/Desktop/MAX-AI/project' when getting requirements to build editable

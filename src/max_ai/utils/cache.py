@@ -5,19 +5,24 @@ from datetime import datetime
 from typing import Optional
 from max_ai.models.response import CacheEntry
 
-DEFAULT_CACHE_FILE = os.path.expanduser("databaze.db")
+DEFAULT_CACHE_FILE = os.path.expanduser("~/.max_ai_cache.json")
 
 
 class CacheManager:
-    def __init__(self, cache_file: str = DEFAULT_CACHE_FILE) -> None:
+    def __init__(self, cache_file: str = DEFAULT_CACHE_FILE, use_sqlite: Optional[bool] = None) -> None:
         self.cache_file = os.path.expanduser(cache_file)
         self._cache: dict[str, CacheEntry] = {}
-        self._use_sqlite = self.cache_file.lower().endswith('.db')
+        self._use_sqlite = self._determine_sqlite(use_sqlite)
         self._conn: Optional[sqlite3.Connection] = None
         if self._use_sqlite:
             self._connect_db()
         else:
             self._load()
+
+    def _determine_sqlite(self, use_sqlite: Optional[bool]) -> bool:
+        if use_sqlite is not None:
+            return use_sqlite
+        return self.cache_file.lower().endswith('.db')
 
     def _connect_db(self) -> None:
         parent_dir = os.path.dirname(self.cache_file)
@@ -36,10 +41,9 @@ class CacheManager:
             with open(self.cache_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 for k, v in data.items():
-                    response = v.get('response') or ""
                     self._cache[k] = CacheEntry(
                         query=v['query'],
-                        response=response,
+                        response=v.get('response', ''),
                         timestamp=datetime.fromisoformat(v['timestamp']),
                         ttl=v['ttl']
                     )
@@ -54,7 +58,7 @@ class CacheManager:
                 'query': v.query,
                 'response': v.response,
                 'timestamp': v.timestamp.isoformat(),
-                'ttl': v.ttl
+                'ttl': v.ttl,
             }
             for k, v in self._cache.items()
         }
@@ -62,7 +66,7 @@ class CacheManager:
         if parent_dir:
             os.makedirs(parent_dir, exist_ok=True)
         with open(self.cache_file, 'w', encoding='utf-8') as f:
-            json.dump(data, f)
+            json.dump(data, f, ensure_ascii=False, indent=2)
 
     def get(self, query: str) -> Optional[CacheEntry]:
         if self._use_sqlite and self._conn is not None:
@@ -77,7 +81,7 @@ class CacheManager:
                     query=query,
                     response=response,
                     timestamp=datetime.fromisoformat(timestamp),
-                    ttl=ttl
+                    ttl=ttl,
                 )
                 if not entry.is_expired():
                     return entry
@@ -94,12 +98,12 @@ class CacheManager:
             query=query,
             response=response,
             timestamp=datetime.now(),
-            ttl=ttl
+            ttl=ttl,
         )
         if self._use_sqlite and self._conn is not None:
             self._conn.execute(
                 "INSERT OR REPLACE INTO cache (query, response, timestamp, ttl) VALUES (?, ?, ?, ?)",
-                (entry.query, entry.response, entry.timestamp.isoformat(), entry.ttl)
+                (entry.query, entry.response, entry.timestamp.isoformat(), entry.ttl),
             )
             self._conn.commit()
             return

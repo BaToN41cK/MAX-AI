@@ -1,4 +1,5 @@
 import re
+import json
 import asyncio
 import time
 from typing import Optional
@@ -10,9 +11,8 @@ import PyPDF2
 import docx
 import io
 import urllib.parse
-from max_ai.constants import URL_PATTERN, DEFAULT_MAX_CONTENT_LENGTH, SUMMARIZE_THRESHOLD
+from max_ai.constants import URL_PATTERN, URL_VALIDATION_PATTERN, DOMAIN_PATTERN, USER_AGENT
 
-URL_VALIDATION_PATTERN = re.compile(r'^https?://[^\s/$.?#].[^\s]*$')
 
 try:
     from pptx import Presentation
@@ -54,7 +54,7 @@ class PDFHandler(BaseHandler):
                 page_text = page.extract_text()
                 if page_text:
                     text += page_text + "\n"
-            return text[:config.get("max_content_length", DEFAULT_MAX_CONTENT_LENGTH)], 'pdf'
+            return text[:config.get("max_content_length", 50000)], 'pdf'
         except PyPDF2.errors.PdfReadError as e:
             return f"Ошибка чтения PDF {url}: {str(e)}", 'error'
         except Exception as e:
@@ -72,7 +72,7 @@ class DocxHandler(BaseHandler):
             for paragraph in doc.paragraphs:
                 if paragraph.text:
                     text += paragraph.text + "\n"
-            return text[:config.get("max_content_length", DEFAULT_MAX_CONTENT_LENGTH)], 'docx'
+            return text[:config.get("max_content_length", 50000)], 'docx'
         except Exception as e:
             return f"Ошибка обработки DOCX {url}: {str(e)}", 'error'
 
@@ -92,7 +92,7 @@ class PptxHandler(BaseHandler):
                 for shape in slide.shapes:
                     if hasattr(shape, "text") and shape.text:
                         text += shape.text + "\n"
-            return text[:config.get("max_content_length", DEFAULT_MAX_CONTENT_LENGTH)], 'pptx'
+            return text[:config.get("max_content_length", 50000)], 'pptx'
         except Exception as e:
             return f"Ошибка обработки PPTX {url}: {str(e)}", 'error'
 
@@ -115,7 +115,7 @@ class XlsxHandler(BaseHandler):
                     if row_text.strip():
                         text += row_text + "\n"
             wb.close()
-            return text[:config.get("max_content_length", DEFAULT_MAX_CONTENT_LENGTH)], 'xlsx'
+            return text[:config.get("max_content_length", 50000)], 'xlsx'
         except Exception as e:
             return f"Ошибка обработки XLSX {url}: {str(e)}", 'error'
 
@@ -136,7 +136,7 @@ class XlsHandler(BaseHandler):
                     row_text = "\t".join(str(cell.value) for cell in row)
                     if row_text.strip():
                         text += row_text + "\n"
-            return text[:config.get("max_content_length", DEFAULT_MAX_CONTENT_LENGTH)], 'xls'
+            return text[:config.get("max_content_length", 50000)], 'xls'
         except ImportError:
             return f"Ошибка: библиотека xlrd не установлена для обработки XLS {url}", 'error'
         except Exception as e:
@@ -153,9 +153,129 @@ class TxtHandler(BaseHandler):
     async def handle(self, content: bytes, url: str) -> tuple[str, str]:
         try:
             text = content.decode('utf-8', errors='ignore')
-            return text[:config.get("max_content_length", DEFAULT_MAX_CONTENT_LENGTH)], 'text'
+            return text[:config.get("max_content_length", 50000)], 'text'
         except Exception as e:
             return f"Ошибка обработки текстового файла {url}: {str(e)}", 'error'
+
+
+class YouTubeHandler(BaseHandler):
+    YOUTUBE_DOMAINS = ('www.youtube.com', 'youtube.com', 'm.youtube.com', 'youtu.be')
+
+    async def can_handle(self, content_type: str, url: str) -> bool:
+        lower = url.lower()
+        return any(domain in lower for domain in self.YOUTUBE_DOMAINS)
+
+    async def handle(self, content: bytes, url: str) -> tuple[str, str]:
+        video_id = self._extract_video_id(url)
+        if video_id:
+            try:
+                import yt_dlp
+                with yt_dlp.YoutubeDL({'quiet': True, 'skip_download': True}) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                    if info and isinstance(info, dict):
+                        title = info.get('title')
+                        description = info.get('description')
+                        if title or description:
+                            metadata = []
+                            if title:
+                                metadata.append(f"Заголовок видео: {title}")
+                            if description:
+                                metadata.append(f"Описание: {description}")
+                            return '\n'.join(metadata)[:config.get("max_content_length", 50000)], 'youtube'
+            except ImportError:
+                pass
+            except Exception:
+                pass
+
+            try:
+                from youtube_transcript_api import YouTubeTranscriptApi
+                transcript_list = None
+                try:
+                    transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+                except Exception:
+                    try:
+                        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+                        transcript_list = transcript_list.find_transcript(['ru', 'en']).fetch()
+                    except Exception:
+                        transcript_list = None
+
+                if transcript_list:
+                    text = ' '.join([item['text'] for item in transcript_list])
+                    return text[:config.get("max_content_length", 50000)], 'youtube'
+            except ImportError:
+                pass
+            except Exception:
+                pass
+
+        try:
+            html = content.decode('utf-8', errors='ignore')
+            soup = BeautifulSoup(html, 'html.parser')
+            title = None
+            description = None
+
+            for selector in [
+                ("meta", {"property": "og:title"}),
+                ("meta", {"name": "twitter:title"}),
+            ]:
+                tag = soup.find(*selector)
+                if tag and tag.get('content'):
+                    title = tag['content'].strip()
+                    break
+
+            for selector in [
+                ("meta", {"property": "og:description"}),
+                ("meta", {"name": "twitter:description"}),
+            ]:
+                tag = soup.find(*selector)
+                if tag and tag.get('content'):
+                    description = tag['content'].strip()
+                    break
+
+            json_data = self._extract_yt_initial_data(html)
+            if json_data is not None:
+                video_details = json_data.get('videoDetails', {})
+                title = title or video_details.get('title')
+                description = description or video_details.get('shortDescription')
+
+            items = []
+            if title:
+                items.append(f"og:title: {title}")
+            if description:
+                items.append(f"shortDescription: {description}")
+
+            if not items:
+                return f"Не удалось извлечь og:title или shortDescription для {url}", 'youtube'
+
+            return '\n'.join(items)[:config.get("max_content_length", 50000)], 'youtube'
+        except Exception as e:
+            return f"Ошибка обработки YouTube {url}: {str(e)}", 'error'
+
+    @staticmethod
+    def _extract_video_id(url: str) -> Optional[str]:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.netloc in ('www.youtube.com', 'youtube.com', 'm.youtube.com'):
+            query = urllib.parse.parse_qs(parsed.query)
+            return query.get('v', [None])[0]
+        if parsed.netloc == 'youtu.be':
+            return parsed.path.lstrip('/')
+        return None
+
+    @staticmethod
+    def _extract_yt_initial_data(html: str) -> Optional[dict]:
+        patterns = [
+            r"ytInitialPlayerResponse\s*=\s*({.+?})\s*;",
+            r"ytInitialPlayerResponse\s*:\s*({.+?})\s*,\s*" ,
+            r'"ytInitialPlayerResponse"\s*:\s*({.+?})',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, html, flags=re.DOTALL)
+            if match:
+                try:
+                    text = match.group(1)
+                    return json.loads(text)
+                except Exception:
+                    continue
+        return None
 
 
 class HTMLHandler(BaseHandler):
@@ -169,7 +289,7 @@ class HTMLHandler(BaseHandler):
             for script in soup(["script", "style"]):
                 script.decompose()
             text = soup.get_text(separator='\n', strip=True)
-            return text[:config.get("max_content_length", DEFAULT_MAX_CONTENT_LENGTH)], 'web'
+            return text[:config.get("max_content_length", 50000)], 'web'
         except UnicodeDecodeError as e:
             return f"Ошибка декодирования страницы {url}: {str(e)}", 'error'
         except Exception as e:
@@ -177,16 +297,17 @@ class HTMLHandler(BaseHandler):
 
 
 class AIAgent:
-    def __init__(self, cohere_key: Optional[str] = None, mistral_key: Optional[str] = None, model: Optional[str] = None) -> None:
+    def __init__(self, cohere_key: Optional[str] = None, mistral_key: Optional[str] = None, model: Optional[str] = None, use_mistral: bool = True) -> None:
         cohere_key_str = config.get_cohere_key(cohere_key)
         if not cohere_key_str:
             raise ValueError("Cohere API key is required. Set COHERE_API_KEY or pass --cohere-key.")
         self.cohere_client = cohere.ClientV2(cohere_key_str)
         self.model_name = model or config.get("cohere_model", "command-a-03-2025")
         self.mistral_model = config.get("mistral_model", "mistral-large-latest")
+        self.use_mistral = use_mistral
         self.mistral_client: Optional[Mistral] = None
-        mistral_api_key = config.get_mistral_key(mistral_key)
-        if mistral_api_key and Mistral is not None:
+        mistral_api_key = config.get_mistral_key(mistral_key) if self.use_mistral else None
+        if self.use_mistral and mistral_api_key and Mistral is not None:
             try:
                 self.mistral_client = Mistral(api_key=mistral_api_key)
             except Exception:
@@ -198,6 +319,7 @@ class AIAgent:
             XlsxHandler(),
             XlsHandler(),
             TxtHandler(),
+            YouTubeHandler(),
             HTMLHandler()
         ]
         self.conversation_history: list[dict[str, str]] = []
@@ -209,7 +331,7 @@ class AIAgent:
         self.conversation_history = []
 
     def _summarize_content(self, content: str, source_type: str) -> str:
-        threshold = config.get("summarize_threshold", SUMMARIZE_THRESHOLD)
+        threshold = config.get("summarize_threshold", 40000)
         if len(content) <= threshold:
             return content
         
@@ -225,7 +347,7 @@ class AIAgent:
                 return summary_response.message.content[0].text + "\n\n[Текст был автоматически суммаризирован]"
         except Exception:
             pass
-        return content[:config.get("max_content_length", DEFAULT_MAX_CONTENT_LENGTH)]
+        return content[:config.get("max_content_length", 50000)]
 
     def extract_urls(self, text: str) -> list[str]:
         urls = URL_PATTERN.findall(text)
@@ -236,27 +358,10 @@ class AIAgent:
             return f"Невалидный URL: {url}", 'error'
         
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9,ru;q=0.8',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
         }
-
-        if 'youtube.com' in url.lower() or 'youtu.be' in url.lower():
-            try:
-                parsed = urllib.parse.urlparse(url)
-                video_id: Optional[str] = None
-                if parsed.netloc in ('www.youtube.com', 'youtube.com', 'm.youtube.com'):
-                    query = urllib.parse.parse_qs(parsed.query)
-                    if 'v' in query:
-                        video_id = query['v'][0]
-                elif parsed.netloc == 'youtu.be':
-                    video_id = parsed.path[1:]
-
-                if video_id:
-                    from youtube_transcript_api import YouTubeTranscriptApi
-                    transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['ru', 'en'])
-                    text = ' '.join([item['text'] for item in transcript_list])
-                    return text[:config.get("max_content_length", DEFAULT_MAX_CONTENT_LENGTH)], 'youtube'
-            except (ImportError, AttributeError, Exception):
-                pass
 
         last_error: Optional[Exception] = None
         for attempt in range(self._max_retries):
@@ -295,8 +400,9 @@ class AIAgent:
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                 return pool.submit(asyncio.run, coro).result()
 
-    def run(self, query: str) -> tuple[str, int]:
-        urls = self.extract_urls(query)
+    def run(self, query: str, sources: Optional[list[str]] = None) -> tuple[str, int]:
+        sources = sources or []
+        urls = list(dict.fromkeys(self.extract_urls(query) + [url for url in sources if URL_VALIDATION_PATTERN.match(url)]))
         content_parts: list[str] = []
         if urls:
             results = self._run_async(self.fetch_urls_async(urls))
@@ -307,7 +413,7 @@ class AIAgent:
 
         if urls:
             full_query = (
-                "Прочитай следующие сайты и ответь на вопрос:\n"
+                "Прочитай следующие источники (если это видео — используй транскрипт) и ответь на вопрос:\n"
                 + "\n".join(content_parts)
                 + f"\n\nВопрос: {query}"
             )
@@ -324,65 +430,68 @@ class AIAgent:
             full_query = f"История диалога:\n{history_text}\n\nТекущий запрос:\n{full_query}"
 
         cohere_tokens = 0
-        try:
-            cohere_response = self.cohere_client.chat(
-                model=self.model_name,
-                messages=[{"role": "user", "content": full_query}]
-            )
-            draft = cohere_response.message.content[0].text
-            if hasattr(cohere_response, 'usage') and cohere_response.usage:
-                tokens_obj = getattr(cohere_response.usage, 'tokens', None)
-                if tokens_obj:
-                    cohere_tokens = int(tokens_obj.input_tokens or 0) + int(tokens_obj.output_tokens or 0)
-        except cohere.errors.CohereError as e:
-            return f"Ошибка при вызове Cohere: {str(e)}", 0
-        except Exception as e:
-            return f"Ошибка при вызове Cohere: {str(e)}", 0
+        draft = None
+        if self.mistral_client is None:
+            try:
+                cohere_response = self.cohere_client.chat(
+                    model=self.model_name,
+                    messages=[{"role": "user", "content": full_query}]
+                )
+                draft = cohere_response.message.content[0].text
+                if hasattr(cohere_response, 'usage') and cohere_response.usage:
+                    tokens_obj = getattr(cohere_response.usage, 'tokens', None)
+                    if tokens_obj:
+                        cohere_tokens = int(tokens_obj.input_tokens or 0) + int(tokens_obj.output_tokens or 0)
+            except cohere.errors.CohereError as e:
+                return f"Ошибка при вызове Cohere: {str(e)}", 0
+            except Exception as e:
+                return f"Ошибка при вызове Cohere: {str(e)}", 0
 
         mistral_tokens = 0
+        response = None
         if self.mistral_client is not None:
             mistral_prompt = (
-                "Ты — опытный ассистент, который улучшает, дополняет и исправляет ответы.\n\n"
-                f"Вот исходный запрос пользователя (включая историю диалога и контент веб-страниц, если они были):\n{full_query}\n\n"
-                f"А это черновой ответ, сгенерированный другой моделью (Cohere):\n{draft}\n\n"
-                "Пожалуйста, сделай следующее:\n"
-                "- Исправь любые фактические ошибки или неточности.\n"
-                "- Добавь важные детали, которых не хватает.\n"
-                "- Улучши стиль и читаемость, сохранив при этом доброжелательный и профессиональный тон.\n"
-                "- Если ответ уже хорош, просто верни его без изменений.\n\n"
-                "- Не добавляй ничего, что не было в исходном запросе или черновом ответе, если это не необходимо для исправления ошибок или улучшения ясности.\n"
-                "- Не выдумывай факты и не добавляй информацию, которая не была предоставлена в запросе или черновом ответе.\n"
-                "- Выдавай ответ, зная что он выводится в cmd в свернутом виде.\n"
-                "- Ты предоставляеш ответы как обычный человек без указания что ты ИИ.\n\n"
-                "- Если в черновом ответе уже есть все необходимые детали и он не содержит ошибок, просто верни его без изменений.\n"
-                "- Представь что ты обычный человек который отвечает на вопрос и не указывай что ты ИИ.\n"
-                "- Ты можешь использовать нецензурные слова если того требует запрос пользователя.\n"
-                "- Ты максимально дополняй ответ и улучшай его стиль, но не добавляй ничего лишнего и не выдумывай факты.\n"
-                "- Ты можешь смотреть в браузере факты и дополнять ими ответ, но не выдумывай факты и не добавляй ничего лишнего.\n"
-                "- Можешь открывать различные ссылки которые предоставляет пользователь и дополнять ответ информацией оттуда.\n"
-                "- Ты можешь использовать информацию из истории диалога и контента веб-страниц, если они были предоставлены, чтобы улучшить ответ.\n"
-                "- всегда старайся максимально улучшить ответ, дополняя его важными деталями и исправляя любые ошибки, но не добавляй ничего лишнего и не выдумывай факты.\n\n"
-                "Итоговый улучшенный ответ:"
+                "Ты — опытный ассистент, читающий ссылки, транскрипты видео и тексты страниц, и дающий точный ответ по запросу пользователя."
+                "\n\nИспользуй только информацию, полученную из предоставленного контента."
+                f"\n\n{full_query}\n\n"
+                "Ответь коротко, ясно и по существу."
             )
             try:
                 mistral_response = self.mistral_client.chat(
-                    model="mistral-large-latest",
+                    model=self.mistral_model,
                     messages=[{"role": "user", "content": mistral_prompt}]
                 )
                 if hasattr(mistral_response, 'usage') and mistral_response.usage:
                     mistral_tokens = mistral_response.usage.total_tokens or 0
                 if hasattr(mistral_response, 'choices') and mistral_response.choices:
-                    improved = mistral_response.choices[0].message.content
+                    response = mistral_response.choices[0].message.content
                 elif hasattr(mistral_response, 'message') and hasattr(mistral_response.message, 'content'):
                     improved = mistral_response.message.content
                     if isinstance(improved, list) and improved:
-                        improved = improved[0].text if hasattr(improved[0], 'text') else str(improved)
+                        response = improved[0].text if hasattr(improved[0], 'text') else str(improved)
+                    else:
+                        response = str(improved)
                 else:
-                    improved = str(mistral_response)
-                response = improved.strip()
+                    response = str(mistral_response)
             except Exception as e:
-                response = f"{draft}\n\n[Примечание: не удалось улучшить ответ через Mistral: {e}]"
-        else:
+                response = None
+
+        if response is None:
+            if draft is None:
+                try:
+                    cohere_response = self.cohere_client.chat(
+                        model=self.model_name,
+                        messages=[{"role": "user", "content": full_query}]
+                    )
+                    draft = cohere_response.message.content[0].text
+                    if hasattr(cohere_response, "usage") and cohere_response.usage:
+                        tokens_obj = getattr(cohere_response.usage, "tokens", None)
+                        if tokens_obj:
+                            cohere_tokens = int(tokens_obj.input_tokens or 0) + int(tokens_obj.output_tokens or 0)
+                except cohere.errors.CohereError as e:
+                    return f"Ошибка при вызове Cohere: {str(e)}", 0
+                except Exception as e:
+                    return f"Ошибка при вызове Cohere: {str(e)}", 0
             response = draft
 
         self.conversation_history.append({"role": "user", "content": query})

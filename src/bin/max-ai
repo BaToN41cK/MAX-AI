@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Simple shim to run MAX-AI CLI from the src directory
+DIR="$(cd "$(dirname "$0")" && pwd)"
+PYTHONPATH="$DIR/.." python -m max_ai.cli "$@"

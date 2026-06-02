@@ -1,9 +1,10 @@
 import sys
 import os
+import types
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
-from max_ai.core.agent import AIAgent, PDFHandler, DocxHandler, HTMLHandler
+from max_ai.core.agent import AIAgent, PDFHandler, DocxHandler, HTMLHandler, YouTubeHandler
 
 
 class TestAIAgent:
@@ -72,3 +73,32 @@ class TestHandlers:
         assert urls == ["https://example.com"]
         urls = agent.extract_urls("Невалидный: https://")
         assert "https://" not in urls or len(urls) == 0
+
+    def test_extracts_youtube_url(self):
+        agent = AIAgent.__new__(AIAgent)
+        agent.conversation_history = []
+        urls = agent.extract_urls("Смотри https://www.youtube.com/watch?v=K_ob1JBbd_g")
+        assert urls == ["https://www.youtube.com/watch?v=K_ob1JBbd_g"]
+
+    @pytest.mark.asyncio
+    async def test_youtube_handler_html_fallback(self, monkeypatch):
+        handler = YouTubeHandler()
+        youtube_module = types.SimpleNamespace(
+            YouTubeTranscriptApi=types.SimpleNamespace(
+                get_transcript=lambda video_id: (_ for _ in ()).throw(Exception("transcript unavailable")),
+                list_transcripts=lambda video_id: types.SimpleNamespace(
+                    find_transcript=lambda langs: (_ for _ in ()).throw(Exception("transcript unavailable"))
+                )
+            )
+        )
+        monkeypatch.setitem(sys.modules, 'youtube_transcript_api', youtube_module)
+
+        html = (
+            '<html><head><title>Test Video</title>'
+            '<meta name="description" content="Sample description for video." />'
+            '</head><body></body></html>'
+        )
+        text, source = await handler.handle(html.encode('utf-8'), "https://www.youtube.com/watch?v=K_ob1JBbd_g")
+        assert "Test Video" in text
+        assert "Sample description for video." in text
+        assert source == 'youtube'

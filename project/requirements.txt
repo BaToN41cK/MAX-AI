@@ -10,7 +10,7 @@ python-pptx
 openpyxl
 xlrd
 youtube-transcript-api>=0.6.0
-colorama
+yt-dlp
 aiohttp
 rich
 PyYAML

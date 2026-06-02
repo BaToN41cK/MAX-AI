@@ -31,7 +31,9 @@ class HistoryEntry:
     timestamp: str
     model_used: str = "cohere"
     estimated_tokens: int = 0
-    domains_visited: list = field(default_factory=list)
+    domains_visited: list[str] = field(default_factory=list)
+    source_urls: list[str] = field(default_factory=list)
+    source_types: list[str] = field(default_factory=list)
 
     def get_domains(self) -> list[str]:
         return DOMAIN_PATTERN.findall(self.query) or []
