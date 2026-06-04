@@ -1,6 +1,6 @@
 import click
 from rich.console import Console
-from .commands import run, status, history, cache
+from .commands import run, status, history, cache, interactive
 from max_ai.core.config import config
 from max_ai.core.rich_click import RichGroup
 
@@ -28,6 +28,7 @@ cli.add_command(status.status)
 cli.add_command(history.history)
 cli.add_command(history.history_clear)
 cli.add_command(cache.cache_clear)
+cli.add_command(interactive.interactive)
 
 
 def main():

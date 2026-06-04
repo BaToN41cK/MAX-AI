@@ -12,6 +12,11 @@ import docx
 import io
 import urllib.parse
 from max_ai.constants import URL_PATTERN, URL_VALIDATION_PATTERN, DOMAIN_PATTERN, USER_AGENT
+import logging
+from .handlers import EPubHandler, CSVHandler, JSONHandler
+from rich.progress import Progress, SpinnerColumn, TextColumn
+
+logger = logging.getLogger(__name__)
 
 
 try:
@@ -33,11 +38,46 @@ try:
 except ImportError:
     ChatCompletionResponse = None  # type: ignore[misc,assignment]
 
+
 class BaseHandler:
+    """
+    Базовый класс для обработчиков контента.
+    
+    Атрибуты:
+        None
+    
+    Методы:
+        can_handle(content_type: str, url: str) -> bool:
+            Проверяет, может ли обработчик обработать данный тип контента.
+        
+        handle(content: bytes, url: str) -> tuple[str, str]:
+            Обрабатывает контент и возвращает текст и тип источника.
+    """
+    
     async def can_handle(self, content_type: str, url: str) -> bool:
+        """
+        Проверяет, может ли обработчик обработать данный тип контента.
+        
+        Аргументы:
+            content_type (str): Тип контента.
+            url (str): URL источника.
+            
+        Возвращает:
+            bool: True, если обработчик может обработать контент, иначе False.
+        """
         return False
 
     async def handle(self, content: bytes, url: str) -> tuple[str, str]:
+        """
+        Обрабатывает контент и возвращает текст и тип источника.
+        
+        Аргументы:
+            content (bytes): Содержимое файла.
+            url (str): URL источника.
+            
+        Возвращает:
+            tuple[str, str]: Текст и тип источника.
+        """
         return "", ""
 
 
@@ -56,8 +96,10 @@ class PDFHandler(BaseHandler):
                     text += page_text + "\n"
             return text[:config.get("max_content_length", 50000)], 'pdf'
         except PyPDF2.errors.PdfReadError as e:
+            logger.error(f"Ошибка чтения PDF {url}: {str(e)}")
             return f"Ошибка чтения PDF {url}: {str(e)}", 'error'
         except Exception as e:
+            logger.error(f"Ошибка обработки PDF {url}: {str(e)}")
             return f"Ошибка обработки PDF {url}: {str(e)}", 'error'
 
 
@@ -74,6 +116,7 @@ class DocxHandler(BaseHandler):
                     text += paragraph.text + "\n"
             return text[:config.get("max_content_length", 50000)], 'docx'
         except Exception as e:
+            logger.error(f"Ошибка обработки DOCX {url}: {str(e)}")
             return f"Ошибка обработки DOCX {url}: {str(e)}", 'error'
 
 
@@ -84,6 +127,7 @@ class PptxHandler(BaseHandler):
 
     async def handle(self, content: bytes, url: str) -> tuple[str, str]:
         if Presentation is None:
+            logger.error(f"Ошибка: библиотека python-pptx не установлена для обработки PPTX {url}")
             return f"Ошибка: библиотека python-pptx не установлена для обработки PPTX {url}", 'error'
         try:
             prs = Presentation(io.BytesIO(content))
@@ -94,6 +138,7 @@ class PptxHandler(BaseHandler):
                         text += shape.text + "\n"
             return text[:config.get("max_content_length", 50000)], 'pptx'
         except Exception as e:
+            logger.error(f"Ошибка обработки PPTX {url}: {str(e)}")
             return f"Ошибка обработки PPTX {url}: {str(e)}", 'error'
 
 
@@ -104,6 +149,7 @@ class XlsxHandler(BaseHandler):
 
     async def handle(self, content: bytes, url: str) -> tuple[str, str]:
         if load_workbook is None:
+            logger.error(f"Ошибка: библиотека openpyxl не установлена для обработки XLSX {url}")
             return f"Ошибка: библиотека openpyxl не установлена для обработки XLSX {url}", 'error'
         try:
             wb = load_workbook(io.BytesIO(content), read_only=True)
@@ -117,6 +163,7 @@ class XlsxHandler(BaseHandler):
             wb.close()
             return text[:config.get("max_content_length", 50000)], 'xlsx'
         except Exception as e:
+            logger.error(f"Ошибка обработки XLSX {url}: {str(e)}")
             return f"Ошибка обработки XLSX {url}: {str(e)}", 'error'
 
 
@@ -138,8 +185,10 @@ class XlsHandler(BaseHandler):
                         text += row_text + "\n"
             return text[:config.get("max_content_length", 50000)], 'xls'
         except ImportError:
+            logger.error(f"Ошибка: библиотека xlrd не установлена для обработки XLS {url}")
             return f"Ошибка: библиотека xlrd не установлена для обработки XLS {url}", 'error'
         except Exception as e:
+            logger.error(f"Ошибка обработки XLS {url}: {str(e)}")
             return f"Ошибка обработки XLS {url}: {str(e)}", 'error'
 
 
@@ -155,6 +204,7 @@ class TxtHandler(BaseHandler):
             text = content.decode('utf-8', errors='ignore')
             return text[:config.get("max_content_length", 50000)], 'text'
         except Exception as e:
+            logger.error(f"Ошибка обработки текстового файла {url}: {str(e)}")
             return f"Ошибка обработки текстового файла {url}: {str(e)}", 'error'
 
 
@@ -183,8 +233,10 @@ class YouTubeHandler(BaseHandler):
                                 metadata.append(f"Описание: {description}")
                             return '\n'.join(metadata)[:config.get("max_content_length", 50000)], 'youtube'
             except ImportError:
+                logger.error("Библиотека yt_dlp не установлена")
                 pass
-            except Exception:
+            except Exception as e:
+                logger.error(f"Ошибка при извлечении метаданных YouTube: {str(e)}")
                 pass
 
             try:
@@ -192,19 +244,23 @@ class YouTubeHandler(BaseHandler):
                 transcript_list = None
                 try:
                     transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
-                except Exception:
+                except Exception as e:
+                    logger.error(f"Ошибка при получении транскрипта YouTube: {str(e)}")
                     try:
                         transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
                         transcript_list = transcript_list.find_transcript(['ru', 'en']).fetch()
-                    except Exception:
+                    except Exception as e:
+                        logger.error(f"Ошибка при поиске транскрипта YouTube: {str(e)}")
                         transcript_list = None
 
                 if transcript_list:
                     text = ' '.join([item['text'] for item in transcript_list])
                     return text[:config.get("max_content_length", 50000)], 'youtube'
             except ImportError:
+                logger.error("Библиотека youtube_transcript_api не установлена")
                 pass
-            except Exception:
+            except Exception as e:
+                logger.error(f"Ошибка при обработке транскрипта YouTube: {str(e)}")
                 pass
 
         try:
@@ -225,6 +281,7 @@ class YouTubeHandler(BaseHandler):
             for selector in [
                 ("meta", {"property": "og:description"}),
                 ("meta", {"name": "twitter:description"}),
+                ("meta", {"name": "description"}),
             ]:
                 tag = soup.find(*selector)
                 if tag and tag.get('content'):
@@ -246,7 +303,8 @@ class YouTubeHandler(BaseHandler):
             if not items:
                 return f"Не удалось извлечь og:title или shortDescription для {url}", 'youtube'
 
-            return '\n'.join(items)[:config.get("max_content_length", 50000)], 'youtube'
+            result = '\n'.join(items)[:config.get("max_content_length", 50000)]
+            return result, 'youtube'
         except Exception as e:
             return f"Ошибка обработки YouTube {url}: {str(e)}", 'error'
 
@@ -273,7 +331,8 @@ class YouTubeHandler(BaseHandler):
                 try:
                     text = match.group(1)
                     return json.loads(text)
-                except Exception:
+                except Exception as e:
+                    logger.error(f"Ошибка при парсинге JSON из HTML: {str(e)}")
                     continue
         return None
 
@@ -291,12 +350,47 @@ class HTMLHandler(BaseHandler):
             text = soup.get_text(separator='\n', strip=True)
             return text[:config.get("max_content_length", 50000)], 'web'
         except UnicodeDecodeError as e:
+            logger.error(f"Ошибка декодирования страницы {url}: {str(e)}")
             return f"Ошибка декодирования страницы {url}: {str(e)}", 'error'
         except Exception as e:
+            logger.error(f"Ошибка обработки HTML {url}: {str(e)}")
             return f"Ошибка обработки HTML {url}: {str(e)}", 'error'
 
 
 class AIAgent:
+    """
+    Основной класс AI-агента для обработки запросов и источников.
+    
+    Атрибуты:
+        cohere_client: Клиент для работы с API Cohere.
+        mistral_client: Клиент для работы с API Mistral.
+        model_name (str): Название модели Cohere.
+        mistral_model (str): Название модели Mistral.
+        use_mistral (bool): Флаг использования Mistral.
+        handlers (list[BaseHandler]): Список обработчиков для различных типов контента.
+        conversation_history (list[dict[str, str]]): История диалога.
+        _rate_limiter: Семафор для ограничения скорости запросов.
+        _timeout (int): Таймаут для запросов.
+        _max_retries (int): Максимальное количество попыток для запросов.
+        _url_cache (dict): Кэш для хранения результатов обработки URL.
+    
+    Методы:
+        clear_history(): Очищает историю диалога.
+        clear_cache(): Очищает кэш URL.
+        _summarize_content(content: str, source_type: str) -> str:
+            Суммаризирует контент, если он слишком длинный.
+        extract_urls(text: str) -> list[str]:
+            Извлекает URL из текста.
+        _fetch_url(url: str, session: aiohttp.ClientSession, retries: int) -> tuple[str, str]:
+            Загружает и обрабатывает контент по URL.
+        fetch_urls_async(urls: list[str]) -> list[tuple[str, str]]:
+            Асинхронно загружает и обрабатывает контент по списку URL.
+        _run_async(coro) -> list[tuple[str, str]]:
+            Запускает асинхронную корутину.
+        run(query: str, sources: Optional[list[str]]) -> tuple[str, int]:
+            Выполняет запрос и возвращает ответ и количество использованных токенов.
+    """
+    
     def __init__(self, cohere_key: Optional[str] = None, mistral_key: Optional[str] = None, model: Optional[str] = None, use_mistral: bool = True) -> None:
         cohere_key_str = config.get_cohere_key(cohere_key)
         if not cohere_key_str:
@@ -310,7 +404,8 @@ class AIAgent:
         if self.use_mistral and mistral_api_key and Mistral is not None:
             try:
                 self.mistral_client = Mistral(api_key=mistral_api_key)
-            except Exception:
+            except Exception as e:
+                logger.error(f"Ошибка при инициализации Mistral клиента: {str(e)}")
                 self.mistral_client = None
         self.handlers: list[BaseHandler] = [
             PDFHandler(),
@@ -320,17 +415,41 @@ class AIAgent:
             XlsHandler(),
             TxtHandler(),
             YouTubeHandler(),
-            HTMLHandler()
+            HTMLHandler(),
+            EPubHandler(),
+            CSVHandler(),
+            JSONHandler()
         ]
         self.conversation_history: list[dict[str, str]] = []
         self._rate_limiter = asyncio.Semaphore(config.get("rate_limit", 5))
         self._timeout = config.get("timeout", 30)
         self._max_retries = config.get("max_retries", 3)
+        self._url_cache = {}
 
     def clear_history(self) -> None:
+        """
+        Очищает историю диалога.
+        """
         self.conversation_history = []
 
+    def clear_cache(self) -> None:
+        """
+        Очищает кэш URL.
+        """
+        self._url_cache.clear()
+        logger.info("Кэш URL очищен")
+
     def _summarize_content(self, content: str, source_type: str) -> str:
+        """
+        Суммаризирует контент, если он слишком длинный.
+        
+        Аргументы:
+            content (str): Текст для суммаризации.
+            source_type (str): Тип источника.
+            
+        Возвращает:
+            str: Суммаризированный текст или обрезанный текст, если суммаризация не удалась.
+        """
         threshold = config.get("summarize_threshold", 40000)
         if len(content) <= threshold:
             return content
@@ -344,18 +463,46 @@ class AIAgent:
                 messages=[{"role": "user", "content": summary_query}]
             )
             if summary_response.message.content and summary_response.message.content[0].text:
+                logger.info(f"Контент успешно суммаризирован (тип: {source_type})")
                 return summary_response.message.content[0].text + "\n\n[Текст был автоматически суммаризирован]"
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Ошибка при суммаризации контента: {str(e)}")
+        
+        logger.warning(f"Суммаризация не удалась, возвращаем обрезанный контент (тип: {source_type})")
         return content[:config.get("max_content_length", 50000)]
 
     def extract_urls(self, text: str) -> list[str]:
+        """
+        Извлекает URL из текста.
+        
+        Аргументы:
+            text (str): Текст, из которого нужно извлечь URL.
+            
+        Возвращает:
+            list[str]: Список извлеченных URL.
+        """
         urls = URL_PATTERN.findall(text)
         return [url for url in urls if URL_VALIDATION_PATTERN.match(url)]
 
     async def _fetch_url(self, url: str, session: aiohttp.ClientSession, retries: int = 3) -> tuple[str, str]:
+        """
+        Загружает и обрабатывает контент по URL.
+        
+        Аргументы:
+            url (str): URL для загрузки.
+            session (aiohttp.ClientSession): Сессия для выполнения запросов.
+            retries (int): Количество попыток загрузки.
+            
+        Возвращает:
+            tuple[str, str]: Текст и тип источника или сообщение об ошибке.
+        """
         if not URL_VALIDATION_PATTERN.match(url):
+            logger.error(f"Невалидный URL: {url}")
             return f"Невалидный URL: {url}", 'error'
+        
+        if url in self._url_cache:
+            logger.info(f"Используем кэшированный результат для URL: {url}")
+            return self._url_cache[url]
         
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -374,25 +521,49 @@ class AIAgent:
 
                         for handler in self.handlers:
                             if await handler.can_handle(content_type, url):
-                                return await handler.handle(content, url)
+                                result = await handler.handle(content, url)
+                                self._url_cache[url] = result
+                                return result
 
+                        logger.warning(f"Не удалось обработать содержимое {url}: неизвестный тип контента")
                         return f"Не удалось обработать содержимое {url}: неизвестный тип контента", 'error'
             except aiohttp.ClientError as e:
                 last_error = e
+                logger.error(f"Ошибка при загрузке URL {url} (попытка {attempt + 1}): {str(e)}")
             except Exception as e:
                 last_error = e
+                logger.error(f"Ошибка при обработке URL {url} (попытка {attempt + 1}): {str(e)}")
             
             if attempt < self._max_retries - 1:
                 await asyncio.sleep(0.5 * (2 ** attempt))
 
+        logger.error(f"Ошибка загрузки {url} после {self._max_retries} попыток: {str(last_error)}")
         return f"Ошибка загрузки {url} после {self._max_retries} попыток: {str(last_error)}", 'error'
 
     async def fetch_urls_async(self, urls: list[str]) -> list[tuple[str, str]]:
+        """
+        Асинхронно загружает и обрабатывает контент по списку URL.
+        
+        Аргументы:
+            urls (list[str]): Список URL для загрузки.
+            
+        Возвращает:
+            list[tuple[str, str]]: Список результатов обработки URL.
+        """
         async with aiohttp.ClientSession() as session:
             tasks = [self._fetch_url(url, session) for url in urls]
             return await asyncio.gather(*tasks)
 
     def _run_async(self, coro) -> list[tuple[str, str]]:
+        """
+        Запускает асинхронную корутину.
+        
+        Аргументы:
+            coro: Корутина для выполнения.
+            
+        Возвращает:
+            list[tuple[str, str]]: Результат выполнения корутины.
+        """
         try:
             return asyncio.run(coro)
         except RuntimeError:
@@ -401,15 +572,31 @@ class AIAgent:
                 return pool.submit(asyncio.run, coro).result()
 
     def run(self, query: str, sources: Optional[list[str]] = None) -> tuple[str, int]:
+        """
+        Выполняет запрос и возвращает ответ и количество использованных токенов.
+        
+        Аргументы:
+            query (str): Запрос пользователя.
+            sources (Optional[list[str]]): Список источников для обработки.
+            
+        Возвращает:
+            tuple[str, int]: Ответ и количество использованных токенов.
+        """
         sources = sources or []
         urls = list(dict.fromkeys(self.extract_urls(query) + [url for url in sources if URL_VALIDATION_PATTERN.match(url)]))
         content_parts: list[str] = []
         if urls:
-            results = self._run_async(self.fetch_urls_async(urls))
-            for url, (content, source_type) in zip(urls, results):
-                if source_type != 'error':
-                    content = self._summarize_content(content, source_type)
-                content_parts.append(f"\n\n--- Содержание {url} (тип: {source_type}) ---\n{content}")
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                transient=True,
+            ) as progress:
+                progress.add_task(description="Обработка источников...", total=None)
+                results = self._run_async(self.fetch_urls_async(urls))
+                for url, (content, source_type) in zip(urls, results):
+                    if source_type != 'error':
+                        content = self._summarize_content(content, source_type)
+                    content_parts.append(f"\n\n--- Содержание {url} (тип: {source_type}) ---\n{content}")
 
         if urls:
             full_query = (
@@ -443,8 +630,10 @@ class AIAgent:
                     if tokens_obj:
                         cohere_tokens = int(tokens_obj.input_tokens or 0) + int(tokens_obj.output_tokens or 0)
             except cohere.errors.CohereError as e:
+                logger.error(f"Ошибка при вызове Cohere: {str(e)}")
                 return f"Ошибка при вызове Cohere: {str(e)}", 0
             except Exception as e:
+                logger.error(f"Ошибка при вызове Cohere: {str(e)}")
                 return f"Ошибка при вызове Cohere: {str(e)}", 0
 
         mistral_tokens = 0
@@ -474,6 +663,7 @@ class AIAgent:
                 else:
                     response = str(mistral_response)
             except Exception as e:
+                logger.error(f"Ошибка при вызове Mistral: {str(e)}")
                 response = None
 
         if response is None:
@@ -489,8 +679,10 @@ class AIAgent:
                         if tokens_obj:
                             cohere_tokens = int(tokens_obj.input_tokens or 0) + int(tokens_obj.output_tokens or 0)
                 except cohere.errors.CohereError as e:
+                    logger.error(f"Ошибка при вызове Cohere: {str(e)}")
                     return f"Ошибка при вызове Cohere: {str(e)}", 0
                 except Exception as e:
+                    logger.error(f"Ошибка при вызове Cohere: {str(e)}")
                     return f"Ошибка при вызове Cohere: {str(e)}", 0
             response = draft
 

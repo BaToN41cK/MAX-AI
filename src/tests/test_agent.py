@@ -95,6 +95,7 @@ class TestHandlers:
 
         html = (
             '<html><head><title>Test Video</title>'
+            '<meta property="og:title" content="Test Video" />'
             '<meta name="description" content="Sample description for video." />'
             '</head><body></body></html>'
         )

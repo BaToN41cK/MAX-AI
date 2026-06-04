@@ -1,6 +1,7 @@
 import click
 from rich.console import Console
 from rich.panel import Panel
+from rich.text import Text
 from max_ai.core.config import config
 from max_ai.core.rich_click import RichCommand
 from max_ai.utils import CacheManager

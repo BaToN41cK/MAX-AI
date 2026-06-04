@@ -147,6 +147,7 @@ mistral_system_prompt: "Ты — опытный ассистент, которы
 
 ```bash
 max-ai run "Привет, как дела?"
+max-ai interactive
 max-ai history
 max-ai history --limit 5
 max-ai history-clear
@@ -163,6 +164,14 @@ max-ai run "Прочитай этот PDF и сделай резюме https://e
 max-ai run "Прочитай этот Word-документ https://example.com/document.docx"
 max-ai run "О чем это видео? https://www.youtube.com/watch?v=example"
 ```
+
+### Интерактивный режим
+
+```bash
+max-ai interactive
+```
+
+В интерактивном режиме вы можете вводить вопросы напрямую в консоль. Для выхода введите `exit`.
 
 ### Полезные параметры
 
@@ -309,7 +318,7 @@ src/max_ai/
 ## Установка через GitHub
 
 ```bash
-pip install "git+https://github.com/yourusername/max-ai.git"
+pip install "https://github.com/BaToN41cK/MAX-AI"
 ```
 
 ## Заметки

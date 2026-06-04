@@ -34,7 +34,7 @@ def status(days: int) -> None:
     history_file = config.history_file or DEFAULT_HISTORY_FILE
     history_mgr = HistoryManager(history_file=history_file)
     stats_data = history_mgr.get_stats(days=days)
-    
+
     summary = Text()
     summary.append(f"Total Requests: ", style="cyan")
     summary.append(f"{stats_data['total_requests']}\n", style="bold bright_green")
@@ -44,8 +44,6 @@ def status(days: int) -> None:
     summary.append(f"{stats_data['average_tokens']:.1f}\n", style="bright_green")
     summary.append(f"Unique Domains: ", style="cyan")
     summary.append(f"{stats_data['unique_domains']}\n", style="bright_green")
-    summary.append(f"Estimated Cost: ", style="cyan")
-    summary.append(f"${stats_data['cost_estimate_usd']:.4f}\n", style="bright_green")
 
     if stats_data['model_usage']:
         models = ", ".join([f"{m} ({c})" for m, c in stats_data['model_usage'].items()])
