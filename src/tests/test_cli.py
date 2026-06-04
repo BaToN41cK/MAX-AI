@@ -1,6 +1,6 @@
 from click.testing import CliRunner
 from max_ai.commands import run as run_cmd
-from max_ai.commands import cache as cache_cmd
+from max_ai.utils import cache as cache_cmd
 from max_ai.commands import history as history_cmd
 from max_ai.commands import status as status_cmd
 from max_ai.core import config

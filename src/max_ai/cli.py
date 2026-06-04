@@ -1,6 +1,8 @@
 import click
 from rich.console import Console
-from .commands import run, status, history, cache, interactive
+
+from .utils import cache
+from .commands import run, status, history, interactive, cache
 from max_ai.core.config import config
 from max_ai.core.rich_click import RichGroup
 
@@ -23,17 +25,15 @@ def cli(ctx, config_path, verbose):
     if ctx.invoked_subcommand is None:
         click.echo(cli.get_help(ctx))
 
-cli.add_command(run.run)
-cli.add_command(status.status)
-cli.add_command(history.history)
-cli.add_command(history.history_clear)
+cli.add_command(run)
+cli.add_command(status)
+cli.add_command(history)
 cli.add_command(cache.cache_clear)
-cli.add_command(interactive.interactive)
+cli.add_command(interactive)
 
 
 def main():
     cli()
-
-
+        
 if __name__ == '__main__':
     main()

@@ -4,6 +4,7 @@ import sqlite3
 from datetime import datetime
 from typing import Optional
 from max_ai.models.response import CacheEntry
+import cachetools
 
 DEFAULT_CACHE_FILE = os.path.expanduser("~/.max_ai_cache.json")
 
@@ -60,13 +61,13 @@ class CacheManager:
                 'timestamp': v.timestamp.isoformat(),
                 'ttl': v.ttl,
             }
-            for k, v in self._cache.items()
+                for k, v in self._cache.items()
         }
         parent_dir = os.path.dirname(self.cache_file)
         if parent_dir:
-            os.makedirs(parent_dir, exist_ok=True)
+                os.makedirs(parent_dir, exist_ok=True)
         with open(self.cache_file, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+                json.dump(data, f, ensure_ascii=False, indent=2)
 
     def get(self, query: str) -> Optional[CacheEntry]:
         if self._use_sqlite and self._conn is not None:

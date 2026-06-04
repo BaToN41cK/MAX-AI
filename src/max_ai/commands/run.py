@@ -73,6 +73,12 @@ def run(query, no_cache, cohere_key, ttl, model, no_mistral, source):
     agent = AIAgent(cohere_key=cohere_key, model=model, use_mistral=not no_mistral)
     cache_mgr = CacheManager(config.cache_file or DEFAULT_CACHE_FILE)
     history_mgr = HistoryManager(config.history_file or DEFAULT_HISTORY_FILE)
+    
+    # Загружаем последние 5 разговоров для контекста
+    last_conversations = history_mgr.get(limit=5)
+    for conversation in last_conversations:
+        agent.conversation_history.append({"role": "user", "content": conversation.get("query", "")})
+        agent.conversation_history.append({"role": "assistant", "content": conversation.get("response", "")})
 
     query_urls = agent.extract_urls(query)
     explicit_urls = [url for url in extra_urls if URL_VALIDATION_PATTERN.match(url)]
