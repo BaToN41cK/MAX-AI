@@ -1,28 +1,16 @@
 from setuptools import setup, find_packages
 
+# Чтение зависимостей из requirements.txt
+def read_requirements():
+    with open("../requirements.txt", "r", encoding="utf-8") as f:
+        return f.read().splitlines()
+
 setup(
     name="max-ai",
     version="0.1.0",
     package_dir={"": "../src"},
     packages=find_packages(where=["../src"], include=["max_ai", "max_ai.*"]),
-    install_requires=[
-        "requests",
-        "python-dotenv",
-        "click",
-        "cohere",
-        "mistralai",
-        "beautifulsoup4",
-        "rich",
-        "aiohttp",
-        "PyPDF2>=3.0.0",
-        "python-docx>=0.8.11",
-        "python-pptx>=0.6.23",
-        "openpyxl>=3.1.0",
-        "xlrd>=1.2.0",
-        "youtube-transcript-api>=0.6.0",
-        "yt-dlp",
-        "PyYAML",
-    ],
+    install_requires=read_requirements(),
     entry_points={
         "console_scripts": [
             "max-ai=max_ai.cli:main",

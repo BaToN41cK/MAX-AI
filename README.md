@@ -40,7 +40,38 @@ src/max_ai/
 - API-ключ Cohere
 - (Опционально) API-ключ Mistral для улучшенных ответов
 
-## Установка
+## Быстрая установка
+
+### 1. Установка через pip
+
+```bash
+pip install max-ai
+```
+
+### 2. Автоматическое добавление в PATH
+
+#### Для Windows:
+Запустите скрипт `install.ps1`:
+```powershell
+."C:\Users\user\Desktop\MAX-AI\install.ps1"
+```
+
+#### Для Linux/macOS:
+Запустите скрипт `install.sh`:
+```bash
+chmod +x install.sh
+./install.sh
+```
+
+### 3. Проверка установки
+
+```bash
+max-ai --help
+```
+
+Если команда не работает, перезапустите терминал.
+
+## Ручная установка
 
 ### 1. Клонируйте репозиторий
 
@@ -74,19 +105,26 @@ cd project
 pip install -e .
 ```
 
-> Если команда `max-ai` не найдена, скорее всего, `Scripts` каталог текущего Python не добавлен в PATH.
+### 4. Добавьте путь к Scripts в PATH
 
-### 4. Проверка установки
+#### Для Windows:
+```powershell
+[Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:USERPROFILE\AppData\Local\Programs\Python\Python313\Scripts", "User")
+```
+
+#### Для Linux/macOS:
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### 5. Проверка установки
 
 ```bash
 max-ai --help
 ```
 
-Если команда не запускается, используйте временный вариант:
-
-```bash
-python -m max_ai.cli --help
-```
+> Если команда `max-ai` не найдена, скорее всего, `Scripts` каталог текущего Python не добавлен в PATH.
 
 ## Настройка окружения
 
